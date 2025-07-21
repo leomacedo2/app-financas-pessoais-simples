@@ -1,6 +1,6 @@
 # App Finanças Pessoais 💰
 
-Aplicativo mobile simples criado com **React Native** + **Expo** para ajudar no controle financeiro da minha família.
+Aplicativo mobile simples criado com **React Native** + **Expo** para ajudar no controle financeiro.
 
 Tecnologias:
 - React Native
