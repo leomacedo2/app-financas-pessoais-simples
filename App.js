@@ -1,5 +1,6 @@
 // App.js
 import React from 'react';
+import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -8,6 +9,9 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
+import ReceitaScreen from './screens/ReceitaScreen';
+import DespesaScreen from './screens/DespesaScreen';
+import CartaoScreen from './screens/CartaoScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -58,19 +62,41 @@ function HomeTabs() {
       />
       <Tab.Screen
         name="Receita"
-        component={HomeScreen}
+        component={ReceitaScreen}
         options={{ tabBarLabel: 'Receita' }} // Rótulo explícito
       />
       <Tab.Screen
         name="Despesa"
-        component={HomeScreen}
+        component={DespesaScreen}
         options={{ tabBarLabel: 'Despesa' }} // Rótulo explícito
       />
       <Tab.Screen
         name="Cartão"
-        component={HomeScreen}
+        component={CartaoScreen}
         options={{ tabBarLabel: 'Cartão' }} // Rótulo explícito
       />
+      {/* <Tab.Screen
+        name="Início"
+        component={HomeScreen}
+        options={{
+          tabBarLabel: () => <Text>Início</Text>, // Agora é JSX e está seguro
+        }}
+      />
+      <Tab.Screen
+        name="Receita"
+        component={ReceitaScreen}
+        options={{ tabBarLabel: () => <Text>Receita</Text> }}
+      />
+      <Tab.Screen
+        name="Despesa"
+        component={DespesaScreen}
+        options={{ tabBarLabel: () => <Text>Despesa</Text> }}
+      />
+      <Tab.Screen
+        name="Cartão"
+        component={CartaoScreen}
+        options={{ tabBarLabel: () => <Text>Cartão</Text> }}
+      /> */}
     </Tab.Navigator>
   );
 }

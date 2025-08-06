@@ -114,7 +114,9 @@ export default function HomeScreen() {
               <View key={item.id} style={styles.debitItemRow}>
                 <Text style={[styles.debitText, styles.descriptionColumn]}>{item.description}</Text>
                 <Text style={[styles.debitText, styles.dateColumn]}>{item.dueDate}</Text>
-                <Text style={[styles.debitValue, styles.valueColumn]}>{item.value.toFixed(2).replace('.', ',')} R$</Text>
+                <Text style={[styles.debitValue, styles.valueColumn]}>
+                  {`${item.value.toFixed(2).replace('.', ',')} R$`}
+                </Text>
               </View>
             ))
           ) : (
@@ -148,23 +150,32 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false} // Esconde a barra de rolagem horizontal
         onMomentumScrollEnd={handleScroll} // Chama a função quando a rolagem para
         initialScrollIndex={currentMonthIndex} // Inicia a rolagem no mês atual (índice 0)
-        getItemLayout={(data, index) => (
-          // Otimização de desempenho: informa à FlatList o tamanho de cada item
-          { length: width, offset: width * index, index }
-        )}
+        // Otimização de desempenho: informa à FlatList o tamanho de cada item
+        getItemLayout={(data, index) => ({
+          length: width,
+          offset: width * index,
+          index,
+      })}
+
       />
 
       {/* Seção de Resumo (Receita Total e Valor Final) - Fixa na parte inferior da TELA */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Receita total:</Text>
-          <Text style={styles.summaryValue}>{receitaTotal.toFixed(2).replace('.', ',')} R$</Text>
+          {/* <Text style={styles.summaryValue}>{receitaTotal.toFixed(2).replace('.', ',')} R$</Text> */}
+          <Text style={styles.summaryValue}>
+            {`${receitaTotal.toFixed(2).replace('.', ',')} R$`}
+          </Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Valor final:</Text>
           {/* Aplica cor vermelha se o valor final for negativo, azul se for positivo */}
-          <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
+          {/* /* <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
             {valorFinalDisplayedMonth.toFixed(2).replace('.', ',')} R$
+          </Text> */}
+          <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
+            {valorFinalDisplayedMonth.toFixed(2).replace('.', ',') + ' R$'}
           </Text>
         </View>
       </View>
