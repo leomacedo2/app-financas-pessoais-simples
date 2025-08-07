@@ -31,42 +31,52 @@ const getMonthName = (date) => {
   return monthNames[d.getMonth()];
 };
 
+// Função para gerar despesas aleatórias para um mês e ano específicos
+const generateRandomExpenses = (year, month, count) => {
+  const expenses = [];
+  const expenseDescriptions = [
+    'Aluguel', 'Conta de Luz', 'Internet', 'Supermercado', 'Academia',
+    'Telefone', 'Transporte', 'Lazer', 'Educação', 'Saúde', 'Restaurante', 'Roupas'
+  ];
+  for (let i = 0; i < count; i++) {
+    const day = Math.floor(Math.random() * 28) + 1; // Dia aleatório entre 1 e 28
+    const value = Math.floor(Math.random() * 500) + 20; // Valor aleatório entre 20 e 520
+    const description = expenseDescriptions[Math.floor(Math.random() * expenseDescriptions.length)];
+    const dueDate = `${day.toString().padStart(2, '0')}/${(month + 1).toString().padStart(2, '0')}/${year}`;
+    expenses.push({
+      id: `${year}-${month}-${i}-${Math.random()}`, // ID único
+      description,
+      dueDate,
+      value,
+    });
+  }
+  return expenses;
+};
+
+
 export default function HomeScreen() {
   // Estado para a receita total (considerada global por enquanto)
   const [receitaTotal, setReceitaTotal] = useState(4000);
 
-  // Estado para todas as despesas, incluindo datas de vencimento para diferentes meses
-  // Ainda são exemplos!
-  const [allDebitItems, setAllDebitItems] = useState(() => {
-    const initialItems = [
-      { id: 'd1', description: 'Aluguel', dueDate: '22/07/2025', value: 1000 },
-      { id: 'd2', description: 'Conta de Luz', dueDate: '15/07/2025', value: 150 },
-      { id: 'd3', description: 'Internet', dueDate: '01/07/2025', value: 100 },
-      { id: 'd4', description: 'Supermercado', dueDate: '28/07/2025', value: 500 },
-      { id: 'd5', description: 'Academia', dueDate: '05/08/2025', value: 80 },
-      { id: 'd6', description: 'Telefone', dueDate: '12/08/2025', value: 70 },
-      { id: 'd7', description: 'Carro', dueDate: '01/09/2025', value: 300 },
-      { id: 'd8', description: 'Streaming', dueDate: '10/09/2025', value: 40 },
-    ];
-
-    // Ordenar os itens por data de vencimento ao inicializar o estado
-    return initialItems.sort((a, b) => {
-      const dateA = parseDateString(a.dueDate);
-      const dateB = parseDateString(b.dueDate);
-      return dateA.getTime() - dateB.getTime(); // Ordena em ordem crescente de data
-    });
-  });
-
-  // Estado para o índice do mês atualmente exibido na rolagem horizontal
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
-  const flatListRef = useRef(null);
-
   // Gerar uma lista de objetos de data para os meses a serem exibidos.
-  // Começa no mês atual e vai para os próximos 2 meses.
+  // Inclui 6 meses anteriores, o mês atual e 6 meses posteriores.
   const generateMonthsToDisplay = () => {
     const today = new Date();
     const months = [];
-    for (let i = 0; i < 3; i++) { // Mês atual + próximos 2 meses
+    const numPastMonths = 6;
+    const numFutureMonths = 6;
+
+    // Adicionar meses anteriores
+    for (let i = numPastMonths; i > 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      months.push(date);
+    }
+
+    // Adicionar o mês atual
+    months.push(new Date(today.getFullYear(), today.getMonth(), 1));
+
+    // Adicionar meses posteriores
+    for (let i = 1; i <= numFutureMonths; i++) {
       const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
       months.push(date);
     }
@@ -75,10 +85,53 @@ export default function HomeScreen() {
 
   const monthsToDisplay = generateMonthsToDisplay();
 
+  // Calcular o initialScrollIndex para que o mês atual seja a "página inicial"
+  const today = new Date();
+  const initialMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  const initialScrollIndex = monthsToDisplay.findIndex(monthDate =>
+    monthDate.getMonth() === initialMonthDate.getMonth() &&
+    monthDate.getFullYear() === initialMonthDate.getFullYear()
+  );
+
+  // Estado para todas as despesas, incluindo datas de vencimento para diferentes meses
+  const [allDebitItems, setAllDebitItems] = useState(() => {
+    let initialItems = [];
+    // Gerar despesas aleatórias para todos os meses no range
+    monthsToDisplay.forEach(monthDate => {
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      // Gerar entre 3 e 7 despesas aleatórias por mês
+      const numExpenses = Math.floor(Math.random() * 5) + 3;
+      initialItems = initialItems.concat(generateRandomExpenses(year, month, numExpenses));
+    });
+
+    // Ordenar os itens por data de vencimento
+    return initialItems.sort((a, b) => {
+      const dateA = parseDateString(a.dueDate);
+      const dateB = parseDateString(b.dueDate);
+      return dateA.getTime() - dateB.getTime(); // Ordena em ordem crescente de data
+    });
+  });
+
+  // Estado para o índice do mês atualmente exibido na rolagem horizontal
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(initialScrollIndex);
+  const flatListRef = useRef(null);
+
+  // useEffect para rolar para o mês atual na montagem
+  useEffect(() => {
+    if (flatListRef.current && initialScrollIndex !== -1) {
+      // Usar setTimeout para garantir que a FlatList esteja renderizada
+      setTimeout(() => {
+        flatListRef.current.scrollToIndex({ index: initialScrollIndex, animated: false });
+      }, 100); // Pequeno delay para garantir que o layout esteja pronto
+    }
+  }, []); // Executa apenas uma vez na montagem do componente
+
   // Função para filtrar as despesas que pertencem a um mês específico
   const getExpensesForMonth = (monthDate) => {
     const targetMonth = monthDate.getMonth();
     const targetYear = monthDate.getFullYear();
+    // As despesas já estão ordenadas por dueDate em allDebitItems
     return allDebitItems.filter(item => {
       const itemDate = parseDateString(item.dueDate);
       return itemDate.getMonth() === targetMonth && itemDate.getFullYear() === targetYear;
@@ -94,12 +147,13 @@ export default function HomeScreen() {
   const renderMonthSection = ({ item: monthDate }) => {
     const expenses = getExpensesForMonth(monthDate);
     const monthName = getMonthName(monthDate);
+    const year = monthDate.getFullYear();
 
     return (
       <View style={styles.monthPage}>
         <View style={styles.section}>
-          {/* Título da seção: nome do mês atual */}
-          <Text style={styles.sectionTitle}>{monthName}</Text>
+          {/* Título da seção: nome do mês e ano */}
+          <Text style={styles.sectionTitle}>{`${monthName} ${year}`}</Text>
 
           {/* Cabeçalho da Tabela */}
           <View style={styles.tableHeader}>
@@ -149,21 +203,19 @@ export default function HomeScreen() {
         pagingEnabled // Faz com que a rolagem "encaixe" em cada página (mês)
         showsHorizontalScrollIndicator={false} // Esconde a barra de rolagem horizontal
         onMomentumScrollEnd={handleScroll} // Chama a função quando a rolagem para
-        initialScrollIndex={currentMonthIndex} // Inicia a rolagem no mês atual (índice 0)
+        initialScrollIndex={initialScrollIndex} // Inicia a rolagem no mês atual
         // Otimização de desempenho: informa à FlatList o tamanho de cada item
         getItemLayout={(data, index) => ({
           length: width,
           offset: width * index,
           index,
-      })}
-
+        })}
       />
 
       {/* Seção de Resumo (Receita Total e Valor Final) - Fixa na parte inferior da TELA */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Receita total:</Text>
-          {/* <Text style={styles.summaryValue}>{receitaTotal.toFixed(2).replace('.', ',')} R$</Text> */}
           <Text style={styles.summaryValue}>
             {`${receitaTotal.toFixed(2).replace('.', ',')} R$`}
           </Text>
@@ -171,9 +223,6 @@ export default function HomeScreen() {
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Valor final:</Text>
           {/* Aplica cor vermelha se o valor final for negativo, azul se for positivo */}
-          {/* /* <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
-            {valorFinalDisplayedMonth.toFixed(2).replace('.', ',')} R$
-          </Text> */}
           <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
             {valorFinalDisplayedMonth.toFixed(2).replace('.', ',') + ' R$'}
           </Text>
