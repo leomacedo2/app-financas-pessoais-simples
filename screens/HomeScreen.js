@@ -64,7 +64,7 @@ export default function HomeScreen() {
     const today = new Date();
     const months = [];
     const numPastMonths = 6;
-    const numFutureMonths = 6;
+    const numFutureMonths = 12;
 
     // Adicionar meses anteriores
     for (let i = numPastMonths; i > 0; i--) {
