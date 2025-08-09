@@ -59,7 +59,7 @@ export default function HomeScreen() {
   const [receitaTotal, setReceitaTotal] = useState(4000);
 
   // Gerar uma lista de objetos de data para os meses a serem exibidos.
-  // Inclui 6 meses anteriores, o mês atual e 6 meses posteriores.
+  // Inclui 6 meses anteriores, o mês atual e 12 meses posteriores.
   const generateMonthsToDisplay = () => {
     const today = new Date();
     const months = [];
@@ -121,9 +121,10 @@ export default function HomeScreen() {
   useEffect(() => {
     if (flatListRef.current && initialScrollIndex !== -1) {
       // Usar setTimeout para garantir que a FlatList esteja renderizada
+      // e que o layout inicial já tenha sido calculado.
       setTimeout(() => {
         flatListRef.current.scrollToIndex({ index: initialScrollIndex, animated: false });
-      }, 100); // Pequeno delay para garantir que o layout esteja pronto
+      }, 100);
     }
   }, []); // Executa apenas uma vez na montagem do componente
 
@@ -144,14 +145,21 @@ export default function HomeScreen() {
   const valorFinalDisplayedMonth = receitaTotal - totalDespesasDisplayedMonth;
 
   // Componente que renderiza a seção de despesas para um único mês
-  const renderMonthSection = ({ item: monthDate }) => {
+  const renderMonthSection = ({ item: monthDate, index }) => { // Obter o índice do item
     const expenses = getExpensesForMonth(monthDate);
     const monthName = getMonthName(monthDate);
     const year = monthDate.getFullYear();
 
+    // Determina se este é o mês atual do sistema (initialMonthDate)
+    const isSystemCurrentMonth = monthDate.getMonth() === initialMonthDate.getMonth() &&
+                                 monthDate.getFullYear() === initialMonthDate.getFullYear();
+
     return (
       <View style={styles.monthPage}>
-        <View style={styles.section}>
+        <View style={[
+          styles.section,
+          isSystemCurrentMonth && styles.currentMonthHighlight // Aplica estilo de destaque SE for o mês atual do sistema
+        ]}>
           {/* Título da seção: nome do mês e ano */}
           <Text style={styles.sectionTitle}>{`${monthName} ${year}`}</Text>
 
@@ -186,6 +194,7 @@ export default function HomeScreen() {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     // Calcula o novo índice do mês com base na posição da rolagem
     const newIndex = Math.round(contentOffsetX / width);
+    // console.log(`Scroll ended. newIndex: ${newIndex}, currentMonthIndex: ${currentMonthIndex}`); // Log para depuração
     if (newIndex !== currentMonthIndex) {
       setCurrentMonthIndex(newIndex);
     }
@@ -204,6 +213,7 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false} // Esconde a barra de rolagem horizontal
         onMomentumScrollEnd={handleScroll} // Chama a função quando a rolagem para
         initialScrollIndex={initialScrollIndex} // Inicia a rolagem no mês atual
+        extraData={currentMonthIndex} // Garante que a FlatList re-renderize quando currentMonthIndex muda
         // Otimização de desempenho: informa à FlatList o tamanho de cada item
         getItemLayout={(data, index) => ({
           length: width,
@@ -253,6 +263,15 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
     minHeight: 250, // Altura mínima para a seção de débitos
+  },
+  currentMonthHighlight: {
+    backgroundColor: 'lightblue', // Cor de fundo para um destaque bem visível
+    borderColor: '#007bff', // Uma borda azul
+    borderWidth: 4, // Mais espessa para destaque
+    shadowColor: '#007bff', // Sombra azul para complementar
+    shadowOpacity: 0.8, // Sombra mais forte
+    shadowRadius: 10, // Sombra maior
+    elevation: 10, // Elevação maior para o destaque no Android
   },
   sectionTitle: {
     fontSize: 20,
