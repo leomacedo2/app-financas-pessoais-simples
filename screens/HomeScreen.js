@@ -1,11 +1,16 @@
 // screens/HomeScreen.js
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+
+// Firebase imports
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, query, onSnapshot } from 'firebase/firestore';
 
 // Obter a largura da tela para rolagem paginada
 const { width } = Dimensions.get('window');
 
-// Funções auxiliares para manipulação de datas
+// Funções auxiliares para manipulação de datas (mantidas fora para reusabilidade, mas sem depender de estados)
 // Converte uma string de data "DD/MM/YYYY" para um objeto Date
 const parseDateString = (dateString) => {
   const [day, month, year] = dateString.split('/').map(Number);
@@ -55,8 +60,13 @@ const generateRandomExpenses = (year, month, count) => {
 
 
 export default function HomeScreen() {
-  // Estado para a receita total (considerada global por enquanto)
-  const [receitaTotal, setReceitaTotal] = useState(4000);
+  const [db, setDb] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [loadingFirebase, setLoadingFirebase] = useState(true);
+  const [allIncomes, setAllIncomes] = useState([]); // Novo estado para todas as receitas
+
+  // --- Funções movidas para dentro do componente HomeScreen ---
 
   // Gerar uma lista de objetos de data para os meses a serem exibidos.
   // Inclui 6 meses anteriores, o mês atual e 12 meses posteriores.
@@ -93,40 +103,6 @@ export default function HomeScreen() {
     monthDate.getFullYear() === initialMonthDate.getFullYear()
   );
 
-  // Estado para todas as despesas, incluindo datas de vencimento para diferentes meses
-  const [allDebitItems, setAllDebitItems] = useState(() => {
-    let initialItems = [];
-    // Gerar despesas aleatórias para todos os meses no range
-    monthsToDisplay.forEach(monthDate => {
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth();
-      // Gerar entre 3 e 7 despesas aleatórias por mês
-      const numExpenses = Math.floor(Math.random() * 5) + 3;
-      initialItems = initialItems.concat(generateRandomExpenses(year, month, numExpenses));
-    });
-
-    // Ordenar os itens por data de vencimento
-    return initialItems.sort((a, b) => {
-      const dateA = parseDateString(a.dueDate);
-      const dateB = parseDateString(b.dueDate);
-      return dateA.getTime() - dateB.getTime(); // Ordena em ordem crescente de data
-    });
-  });
-
-  // Estado para o índice do mês atualmente exibido na rolagem horizontal
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(initialScrollIndex);
-  const flatListRef = useRef(null);
-
-  // useEffect para rolar para o mês atual na montagem
-  useEffect(() => {
-    if (flatListRef.current && initialScrollIndex !== -1) {
-      // Usar setTimeout para garantir que a FlatList esteja renderizada
-      // e que o layout inicial já tenha sido calculado.
-      setTimeout(() => {
-        flatListRef.current.scrollToIndex({ index: initialScrollIndex, animated: false });
-      }, 100);
-    }
-  }, []); // Executa apenas uma vez na montagem do componente
 
   // Função para filtrar as despesas que pertencem a um mês específico
   const getExpensesForMonth = (monthDate) => {
@@ -139,10 +115,129 @@ export default function HomeScreen() {
     });
   };
 
-  // Calcula o total de despesas e o valor final para o mês *atualmente visível*
+  // --- Fim das funções movidas ---
+
+
+  // Estado para todas as despesas, incluindo datas de vencimento para diferentes meses
+  const [allDebitItems, setAllDebitItems] = useState(() => {
+    let initialItems = [];
+    // Gerar despesas aleatórias para todos os meses no range
+    // O monthsToDisplay já está disponível aqui no escopo da função de inicialização
+    monthsToDisplay.forEach(monthDate => {
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      const numExpenses = Math.floor(Math.random() * 5) + 3;
+      initialItems = initialItems.concat(generateRandomExpenses(year, month, numExpenses));
+    });
+
+    // Ordenar os itens por data de vencimento
+    return initialItems.sort((a, b) => {
+      const dateA = parseDateString(a.dueDate);
+      const dateB = parseDateString(b.dueDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+  });
+
+  // Estado para o índice do mês atualmente exibido na rolagem horizontal
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(initialScrollIndex);
+  const flatListRef = useRef(null);
+
+  // Initialize Firebase and fetch data
+  useEffect(() => {
+    const initializeFirebase = async () => {
+      try {
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const app = initializeApp(firebaseConfig);
+        const authInstance = getAuth(app);
+        const dbInstance = getFirestore(app);
+
+        setAuth(authInstance);
+        setDb(dbInstance);
+
+        const unsubscribeAuth = onAuthStateChanged(authInstance, async (user) => {
+          if (user) {
+            setUserId(user.uid);
+            setLoadingFirebase(false);
+          } else {
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            if (initialAuthToken) {
+              await signInWithCustomToken(authInstance, initialAuthToken);
+            } else {
+              await signInAnonymously(authInstance);
+            }
+            // Ensure userId is set after auth state is determined
+            setUserId(authInstance.currentUser?.uid || crypto.randomUUID());
+            setLoadingFirebase(false);
+          }
+        });
+
+        return () => unsubscribeAuth(); // Cleanup auth listener
+      } catch (error) {
+        console.error("Error initializing Firebase:", error);
+        setLoadingFirebase(false);
+      }
+    };
+
+    initializeFirebase();
+  }, []); // Run once on component mount
+
+  // Fetch incomes from Firestore when db and userId are ready
+  useEffect(() => {
+    if (db && userId) {
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+      const incomesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/incomes`);
+      const q = query(incomesCollectionRef);
+
+      const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+        const incomesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setAllIncomes(incomesData);
+      }, (error) => {
+        console.error("Erro ao buscar receitas:", error);
+      });
+
+      return () => unsubscribeSnapshot(); // Cleanup snapshot listener
+    }
+  }, [db, userId]); // Re-run when db or userId changes
+
+  // useEffect para rolar para o mês atual na montagem
+  useEffect(() => {
+    if (flatListRef.current && initialScrollIndex !== -1 && !loadingFirebase) { // Adiciona loadingFirebase como condição
+      setTimeout(() => {
+        flatListRef.current.scrollToIndex({ index: initialScrollIndex, animated: false });
+      }, 100);
+    }
+  }, [initialScrollIndex, loadingFirebase]); // Depende de initialScrollIndex e loadingFirebase
+
+  // Calcula a receita total para o mês atualmente exibido
+  const calculateTotalIncomeForMonth = (monthDate) => {
+    const targetMonth = monthDate.getMonth();
+    const targetYear = monthDate.getFullYear();
+    let totalIncome = 0;
+
+    allIncomes.forEach(income => {
+      if (income.type === 'Fixo') {
+        // Receitas fixas contam para todos os meses (ou de acordo com a regra de "a partir de")
+        // Para simplificar, consideramos que uma receita fixa vale para todos os meses mostrados
+        totalIncome += income.value;
+      } else if (income.type === 'Ganho' && income.month === targetMonth && income.year === targetYear) {
+        // Ganhos contam apenas para o mês específico
+        totalIncome += income.value;
+      }
+    });
+    return totalIncome;
+  };
+
+  const currentMonthTotalIncome = calculateTotalIncomeForMonth(monthsToDisplay[currentMonthIndex]);
+
+  // Calcula o total de despesas para o mês *atualmente visível*
   const currentDisplayedMonthExpenses = getExpensesForMonth(monthsToDisplay[currentMonthIndex]);
   const totalDespesasDisplayedMonth = currentDisplayedMonthExpenses.reduce((sum, item) => sum + item.value, 0);
-  const valorFinalDisplayedMonth = receitaTotal - totalDespesasDisplayedMonth;
+
+  // Calcula o valor final para o mês *atualmente visível*
+  const valorFinalDisplayedMonth = currentMonthTotalIncome - totalDespesasDisplayedMonth;
 
   // Componente que renderiza a seção de despesas para um único mês
   const renderMonthSection = ({ item: monthDate, index }) => { // Obter o índice do item
@@ -194,11 +289,19 @@ export default function HomeScreen() {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     // Calcula o novo índice do mês com base na posição da rolagem
     const newIndex = Math.round(contentOffsetX / width);
-    // console.log(`Scroll ended. newIndex: ${newIndex}, currentMonthIndex: ${currentMonthIndex}`); // Log para depuração
     if (newIndex !== currentMonthIndex) {
       setCurrentMonthIndex(newIndex);
     }
   };
+
+  if (loadingFirebase) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text>Carregando dados de finanças...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -227,7 +330,7 @@ export default function HomeScreen() {
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Receita total:</Text>
           <Text style={styles.summaryValue}>
-            {`${receitaTotal.toFixed(2).replace('.', ',')} R$`}
+            {`${currentMonthTotalIncome.toFixed(2).replace('.', ',')} R$`}
           </Text>
         </View>
         <View style={styles.summaryRow}>
@@ -246,6 +349,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5', // Fundo claro para a tela
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   monthPage: {
     width: width, // Cada página (mês) terá a largura total da tela
