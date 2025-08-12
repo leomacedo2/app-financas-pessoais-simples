@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Button } from 'react-native';
 
 export default function LoginScreen({ navigation }) {
   const fazerLogin = () => {
-    // alert('Login feito com sucesso!'); -- talvez precise desse alerta mais tarde
     navigation.navigate('Home');
   };
 
