@@ -1,5 +1,9 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# firebaseCOnfig.js
+# This file contains sensitive information and should not be committed to the repository
+utils/firebaseConfig.js
+
 # dependencies
 node_modules/
 
