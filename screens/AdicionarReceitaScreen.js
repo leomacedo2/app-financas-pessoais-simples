@@ -5,8 +5,9 @@ import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function AdicionarReceitaScreen({ navigation }) {
-  const [loadingApp, setLoadingApp] = useState(false); // Mudado de loadingFirebase para loadingApp
+// A prop `route` vem do React Navigation e contém `params`
+export default function AdicionarReceitaScreen({ navigation, route }) {
+  const [loadingApp, setLoadingApp] = useState(false);
   
   const [incomeName, setIncomeName] = useState('');
   const [incomeValue, setIncomeValue] = useState('');
@@ -14,6 +15,37 @@ export default function AdicionarReceitaScreen({ navigation }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [savingIncome, setSavingIncome] = useState(false);
+
+  // Estado para verificar se estamos em modo de edição
+  const [isEditing, setIsEditing] = useState(false);
+  // Estado para guardar o ID da receita se estivermos editando
+  const [currentIncomeId, setCurrentIncomeId] = useState(null);
+
+  // useEffect para preencher o formulário se for uma edição
+  useEffect(() => {
+    if (route.params?.incomeToEdit) {
+      const income = route.params.incomeToEdit;
+      setIsEditing(true);
+      setCurrentIncomeId(income.id);
+      setIncomeName(income.name);
+      setIncomeValue(income.value.toFixed(2).replace('.', ',')); // Formata o valor para exibição
+      setIncomeType(income.type);
+      if (income.type === 'Ganho' && income.month !== undefined && income.year !== undefined) {
+        // Recria a data a partir do mês e ano armazenados
+        setSelectedDate(new Date(income.year, income.month, 1));
+      } else {
+        setSelectedDate(new Date()); // Define a data atual se não for tipo Ganho ou dados ausentes
+      }
+    } else {
+      // Garante que o formulário esteja limpo para uma nova adição
+      setIsEditing(false);
+      setCurrentIncomeId(null);
+      setIncomeName('');
+      setIncomeValue('');
+      setIncomeType('Fixo');
+      setSelectedDate(new Date());
+    }
+  }, [route.params?.incomeToEdit]); // Roda quando `incomeToEdit` nos params muda
 
   const handleDateChange = (event, date) => {
     setShowDatePicker(Platform.OS === 'ios');
@@ -26,8 +58,8 @@ export default function AdicionarReceitaScreen({ navigation }) {
     setShowDatePicker(true);
   };
 
-  const handleAddIncome = async () => {
-    console.log("handleAddIncome iniciado. savingIncome:", savingIncome);
+  const handleSaveIncome = async () => { // Renomeado para handleSaveIncome
+    console.log("handleSaveIncome iniciado. savingIncome:", savingIncome);
     if (!incomeName.trim() || !incomeValue.trim()) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios.');
       return;
@@ -45,48 +77,78 @@ export default function AdicionarReceitaScreen({ navigation }) {
       const existingIncomesJson = await AsyncStorage.getItem('incomes');
       let incomes = existingIncomesJson ? JSON.parse(existingIncomesJson) : [];
 
-      const newIncome = {
-        id: Date.now().toString(),
+      let incomeData = {
         name: incomeName.trim(),
         value: value,
         type: incomeType,
-        createdAt: new Date().toISOString(),
       };
 
       if (incomeType === 'Ganho') {
-        newIncome.month = selectedDate.getMonth();
-        newIncome.year = selectedDate.getFullYear();
+        incomeData.month = selectedDate.getMonth();
+        incomeData.year = selectedDate.getFullYear();
       }
 
-      incomes.push(newIncome);
-      await AsyncStorage.setItem('incomes', JSON.stringify(incomes));
+      if (isEditing && currentIncomeId) {
+        // Modo de Edição: Encontra e atualiza a receita existente
+        incomeData.id = currentIncomeId; // Mantém o mesmo ID
+        incomeData.createdAt = route.params.incomeToEdit.createdAt; // Mantém a data de criação original
 
-      console.log("Receita adicionada com sucesso no AsyncStorage.");
-      setSavingIncome(false);
-      console.log("savingIncome desativado.");
-
-      Alert.alert('Sucesso', 'Receita adicionada com sucesso!', [
-        {
-          text: "OK",
-          onPress: () => {
-            setTimeout(() => {
-              navigation.goBack();
-              console.log("Navegando de volta para a lista de receitas.");
-            }, 100);
-          }
+        const index = incomes.findIndex(inc => inc.id === currentIncomeId);
+        if (index !== -1) {
+          incomes[index] = incomeData; // Atualiza o item no array
+        } else {
+          console.warn("Receita a ser editada não encontrada. Adicionando como nova.");
+          incomes.push({ ...incomeData, id: Date.now().toString(), createdAt: new Date().toISOString() });
         }
-      ]);
+        await AsyncStorage.setItem('incomes', JSON.stringify(incomes));
+        console.log("Receita atualizada com sucesso no AsyncStorage.");
 
+        Alert.alert('Sucesso', 'Receita atualizada com sucesso!', [
+          {
+            text: "OK",
+            onPress: () => {
+              setTimeout(() => {
+                navigation.goBack();
+                console.log("Navegando de volta para a lista de receitas após edição.");
+              }, 100);
+            }
+          }
+        ]);
+
+      } else {
+        // Modo de Adição: Adiciona uma nova receita
+        incomeData.id = Date.now().toString(); // ID único para a nova receita
+        incomeData.createdAt = new Date().toISOString(); // Data de criação da nova receita
+
+        incomes.push(incomeData);
+        await AsyncStorage.setItem('incomes', JSON.stringify(incomes));
+        console.log("Receita adicionada com sucesso no AsyncStorage.");
+
+        Alert.alert('Sucesso', 'Receita adicionada com sucesso!', [
+          {
+            text: "OK",
+            onPress: () => {
+              setTimeout(() => {
+                navigation.goBack();
+                console.log("Navegando de volta para a lista de receitas após adição.");
+              }, 100);
+            }
+          }
+        ]);
+      }
+
+      // Limpa o formulário após o sucesso (independentemente do alerta)
       setIncomeName('');
       setIncomeValue('');
       setIncomeType('Fixo');
       setSelectedDate(new Date());
 
     } catch (error) {
-      console.error("AdicionarReceitaScreen: Erro ao adicionar receita no AsyncStorage:", error);
-      Alert.alert('Erro', `Ocorreu um erro ao adicionar a receita: ${error.message}. Tente novamente.`);
+      console.error("AdicionarReceitaScreen: Erro ao salvar receita no AsyncStorage:", error);
+      Alert.alert('Erro', `Ocorreu um erro ao salvar a receita: ${error.message}. Tente novamente.`);
+    } finally {
       setSavingIncome(false);
-      console.log("savingIncome desativado devido a erro.");
+      console.log("savingIncome desativado.");
     }
   };
 
@@ -101,7 +163,7 @@ export default function AdicionarReceitaScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Adicionar Nova Receita</Text>
+      <Text style={styles.title}>{isEditing ? "Editar Receita" : "Adicionar Nova Receita"}</Text>
 
       <TextInput
         style={styles.input}
@@ -152,13 +214,13 @@ export default function AdicionarReceitaScreen({ navigation }) {
 
       <TouchableOpacity
         style={styles.addButton}
-        onPress={handleAddIncome}
+        onPress={handleSaveIncome} // Chamada para a nova função de salvar/atualizar
         disabled={savingIncome}
       >
         {savingIncome ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Adicionar Receita</Text>
+          <Text style={styles.buttonText}>{isEditing ? "Salvar Alterações" : "Adicionar Receita"}</Text>
         )}
       </TouchableOpacity>
     </View>

@@ -109,12 +109,10 @@ export default function HomeScreen() {
       // Carregar Receitas
       const storedIncomesJson = await AsyncStorage.getItem('incomes');
       const storedIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
-      if (JSON.stringify(storedIncomes) !== JSON.stringify(allIncomes)) {
-        setAllIncomes(storedIncomes);
-        console.log("HomeScreen: Receitas carregadas do AsyncStorage. Total:", storedIncomes.length);
-      } else {
-        console.log("HomeScreen: Receitas do AsyncStorage inalteradas.");
-      }
+      // CORREÇÃO: Removido o if (JSON.stringify...) para garantir a atualização
+      setAllIncomes(storedIncomes);
+      console.log("HomeScreen: Receitas carregadas do AsyncStorage. Total:", storedIncomes.length);
+      
 
       // Carregar/Gerar Despesas
       const storedExpensesJson = await AsyncStorage.getItem('expenses');
@@ -127,19 +125,16 @@ export default function HomeScreen() {
         currentExpenses = JSON.parse(storedExpensesJson);
         console.log("HomeScreen: Despesas carregadas do AsyncStorage. Total:", currentExpenses.length);
       }
-      if (JSON.stringify(currentExpenses) !== JSON.stringify(allExpenses)) {
-        setAllExpenses(currentExpenses);
-      } else {
-        console.log("HomeScreen: Despesas do AsyncStorage inalteradas.");
-      }
-
+      // CORREÇÃO: Removido o if (JSON.stringify...) para garantir a atualização
+      setAllExpenses(currentExpenses);
+      
     } catch (error) {
       console.error("HomeScreen: Erro ao carregar dados do AsyncStorage:", error);
       Alert.alert('Erro de Carregamento', 'Não foi possível carregar os dados de finanças do armazenamento local.');
     } finally {
       setLoadingApp(false);
     }
-  }, []);
+  }, []); // Array de dependências vazio para useCallback
 
   useFocusEffect(
     useCallback(() => {
@@ -173,7 +168,6 @@ export default function HomeScreen() {
     let totalIncome = 0;
 
     allIncomes.forEach(income => {
-      // CORREÇÃO: Usar income.month e income.year para receitas do tipo 'Ganho'
       if (income.type === 'Fixo') {
         totalIncome += income.value;
       } else if (income.type === 'Ganho' && income.month === targetMonth && income.year === targetYear) {
