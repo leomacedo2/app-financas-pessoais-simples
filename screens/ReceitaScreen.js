@@ -1,6 +1,6 @@
 // screens/ReceitaScreen.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert, Modal, Pressable } from 'react-native'; // Adicionado Modal, Pressable
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert, Modal, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,23 +9,25 @@ export default function ReceitaScreen({ navigation }) {
   const [loadingApp, setLoadingApp] = useState(true);
   const [incomes, setIncomes] = useState([]);
   const [isActionModalVisible, setIsActionModalVisible] = useState(false);
-  const [selectedIncome, setSelectedIncome] = useState(null); // Para guardar a receita selecionada
+  const [selectedIncome, setSelectedIncome] = useState(null);
 
-  // Função para carregar as receitas do AsyncStorage
   const loadIncomes = useCallback(async () => {
     setLoadingApp(true);
     try {
       const storedIncomesJson = await AsyncStorage.getItem('incomes');
       const storedIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
       
-      const sortedIncomes = storedIncomes.sort((a, b) => {
+      // Filtra para exibir apenas receitas ativas na lista (no ReceitaScreen)
+      const activeIncomes = storedIncomes.filter(income => income.status !== 'inactive');
+
+      const sortedIncomes = activeIncomes.sort((a, b) => {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
         return dateB.getTime() - dateA.getTime();
       });
 
       setIncomes(sortedIncomes);
-      console.log("Receitas carregadas do AsyncStorage. Total:", sortedIncomes.length);
+      console.log("Receitas carregadas (ativas) do AsyncStorage. Total:", sortedIncomes.length);
     } catch (error) {
       console.error("Erro ao carregar receitas do AsyncStorage:", error);
       Alert.alert('Erro', 'Não foi possível carregar as receitas do armazenamento local.');
@@ -34,34 +36,29 @@ export default function ReceitaScreen({ navigation }) {
     }
   }, []);
 
-  // Usa useFocusEffect para recarregar as receitas sempre que a tela estiver em foco
   useFocusEffect(
     useCallback(() => {
       loadIncomes();
-      return () => {
-        // Opcional: Lógica de limpeza se necessário ao desfocar
-      };
+      return () => {};
     }, [loadIncomes])
   );
 
-  // Função para lidar com o toque longo em um item da receita
   const handleLongPressIncome = (income) => {
     setSelectedIncome(income);
     setIsActionModalVisible(true);
   };
 
-  // Função para excluir uma receita
   const handleDeleteIncome = async () => {
     if (!selectedIncome) return;
 
     Alert.alert(
       "Confirmar Exclusão",
-      `Tem certeza que deseja excluir a receita "${selectedIncome.name}"?`,
+      `Tem certeza que deseja excluir a receita "${selectedIncome.name}"? (Ela será removida dos meses futuros)`,
       [
         {
           text: "Cancelar",
           style: "cancel",
-          onPress: () => setIsActionModalVisible(false) // Fecha o modal ao cancelar
+          onPress: () => setIsActionModalVisible(false)
         },
         {
           text: "Excluir",
@@ -70,16 +67,23 @@ export default function ReceitaScreen({ navigation }) {
               const existingIncomesJson = await AsyncStorage.getItem('incomes');
               let incomesArray = existingIncomesJson ? JSON.parse(existingIncomesJson) : [];
               
-              const updatedIncomes = incomesArray.filter(
-                (income) => income.id !== selectedIncome.id
-              );
+              const updatedIncomesArray = incomesArray.map(income => {
+                if (income.id === selectedIncome.id) {
+                  return {
+                    ...income,
+                    status: 'inactive', // Marcar como inativo
+                    deletedAt: new Date().toISOString(), // Registrar data de exclusão
+                  };
+                }
+                return income;
+              });
 
-              await AsyncStorage.setItem('incomes', JSON.stringify(updatedIncomes));
-              setIncomes(updatedIncomes); // Atualiza o estado da lista
-              setIsActionModalVisible(false); // Fecha o modal
-              setSelectedIncome(null); // Limpa a receita selecionada
-              Alert.alert('Sucesso', 'Receita excluída com sucesso!');
-              console.log("Receita excluída do AsyncStorage.");
+              await AsyncStorage.setItem('incomes', JSON.stringify(updatedIncomesArray));
+              loadIncomes(); // Recarrega a lista para mostrar apenas as ativas
+              setIsActionModalVisible(false);
+              setSelectedIncome(null);
+              Alert.alert('Sucesso', 'Receita excluída com sucesso! (Não aparecerá mais nos meses atuais/futuros)');
+              console.log("Receita marcada como inativa no AsyncStorage.");
             } catch (error) {
               console.error("Erro ao excluir receita do AsyncStorage:", error);
               Alert.alert('Erro', 'Não foi possível excluir a receita.');
@@ -90,9 +94,8 @@ export default function ReceitaScreen({ navigation }) {
     );
   };
 
-  // Função para editar uma receita (navega para AdicionarReceitaScreen)
   const handleEditIncome = () => {
-    setIsActionModalVisible(false); // Fecha o modal
+    setIsActionModalVisible(false);
     if (selectedIncome) {
       navigation.navigate('AdicionarReceita', { incomeToEdit: selectedIncome });
     }
@@ -101,14 +104,13 @@ export default function ReceitaScreen({ navigation }) {
   const renderIncomeItem = ({ item }) => (
     <TouchableOpacity
       style={styles.incomeItem}
-      onLongPress={() => handleLongPressIncome(item)} // Adicionado onLongPress
+      onLongPress={() => handleLongPressIncome(item)}
     >
       <Text style={styles.incomeName}>{item.name}</Text>
       <View style={styles.incomeDetails}>
         <Text style={styles.incomeType}>{item.type === 'Fixo' ? 'Fixo' : 'Ganho Pontual'}</Text>
         {item.type === 'Ganho' && item.month !== undefined && item.year !== undefined && (
           <Text style={styles.incomeDate}>
-            {/* Mês + 1 pois é 0-indexado em JavaScript */}
             {`${(item.month + 1).toString().padStart(2, '0')}/${item.year}`}
           </Text>
         )}
@@ -156,7 +158,7 @@ export default function ReceitaScreen({ navigation }) {
         visible={isActionModalVisible}
         onRequestClose={() => {
           setIsActionModalVisible(!isActionModalVisible);
-          setSelectedIncome(null); // Limpa a seleção ao fechar
+          setSelectedIncome(null);
         }}
       >
         <Pressable
@@ -283,12 +285,11 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 5,
   },
-  // Estilos do Modal
   centeredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)', // Fundo escuro transparente
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalView: {
     margin: 20,
@@ -304,7 +305,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: '80%', // Largura do modal
+    width: '80%',
   },
   modalTitle: {
     marginBottom: 20,
@@ -317,17 +318,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     elevation: 2,
-    width: '100%', // Botões ocupam a largura total do modal
-    marginBottom: 10, // Espaçamento entre botões
+    width: '100%',
+    marginBottom: 10,
   },
   buttonEdit: {
-    backgroundColor: '#2196F3', // Azul para editar
+    backgroundColor: '#2196F3',
   },
   buttonDelete: {
-    backgroundColor: '#f44336', // Vermelho para excluir
+    backgroundColor: '#f44336',
   },
   buttonClose: {
-    backgroundColor: '#9e9e9e', // Cinza para cancelar
+    backgroundColor: '#9e9e9e',
   },
   buttonTextStyle: {
     color: 'white',

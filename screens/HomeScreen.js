@@ -29,18 +29,19 @@ const getMonthName = (date) => {
   return monthNames[d.getMonth()];
 };
 
+// Modificado para 12 meses anteriores e 12 meses posteriores
 const generateMonthsToDisplay = () => {
   const today = new Date();
   const months = [];
-  const numPastMonths = 6;
-  const numFutureMonths = 12;
+  const numPastMonths = 12; // 12 meses anteriores
+  const numFutureMonths = 12; // 12 meses posteriores
 
   for (let i = numPastMonths; i > 0; i--) {
     const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
     months.push(date);
   }
 
-  months.push(new Date(today.getFullYear(), today.getMonth(), 1));
+  months.push(new Date(today.getFullYear(), today.getMonth(), 1)); // Mês atual
 
   for (let i = 1; i <= numFutureMonths; i++) {
     const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
@@ -69,6 +70,7 @@ const generateInitialExpenses = (monthsToDisplay) => {
         description,
         value,
         createdAt: createdAtDate.toISOString(),
+        status: 'active', // Despesas iniciais também são ativas
       });
     }
   });
@@ -94,9 +96,22 @@ export default function HomeScreen() {
   const getExpensesForMonth = (monthDate) => {
     const targetMonth = monthDate.getMonth();
     const targetYear = monthDate.getFullYear();
+    const currentMonthTimestamp = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
+    const monthDateTimestamp = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).getTime();
+
     return allExpenses.filter(item => {
       const itemDate = new Date(item.createdAt);
-      return itemDate.getMonth() === targetMonth && itemDate.getFullYear() === targetYear;
+      const itemMonth = itemDate.getMonth();
+      const itemYear = itemDate.getFullYear();
+
+      // Despesas aparecem no mês em que foram criadas
+      const isExpenseRelevantToMonth = itemMonth === targetMonth && itemYear === targetYear;
+
+      // Lógica de exclusão suave para despesas (futuramente)
+      // Por enquanto, consideramos todas as despesas geradas ativas
+      // Futuramente: if (item.status === 'inactive' && new Date(item.deletedAt).getTime() <= monthDateTimestamp) { return false; }
+
+      return isExpenseRelevantToMonth;
     });
   };
 
@@ -106,15 +121,11 @@ export default function HomeScreen() {
   const loadData = useCallback(async () => {
     setLoadingApp(true);
     try {
-      // Carregar Receitas
       const storedIncomesJson = await AsyncStorage.getItem('incomes');
       const storedIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
-      // CORREÇÃO: Removido o if (JSON.stringify...) para garantir a atualização
       setAllIncomes(storedIncomes);
       console.log("HomeScreen: Receitas carregadas do AsyncStorage. Total:", storedIncomes.length);
       
-
-      // Carregar/Gerar Despesas
       const storedExpensesJson = await AsyncStorage.getItem('expenses');
       let currentExpenses;
       if (!storedExpensesJson) {
@@ -125,7 +136,6 @@ export default function HomeScreen() {
         currentExpenses = JSON.parse(storedExpensesJson);
         console.log("HomeScreen: Despesas carregadas do AsyncStorage. Total:", currentExpenses.length);
       }
-      // CORREÇÃO: Removido o if (JSON.stringify...) para garantir a atualização
       setAllExpenses(currentExpenses);
       
     } catch (error) {
@@ -134,7 +144,7 @@ export default function HomeScreen() {
     } finally {
       setLoadingApp(false);
     }
-  }, []); // Array de dependências vazio para useCallback
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -167,11 +177,52 @@ export default function HomeScreen() {
     const targetYear = monthDate.getFullYear();
     let totalIncome = 0;
 
+    // Converte o mês exibido para um objeto Date no primeiro dia do mês
+    const displayMonthStart = new Date(targetYear, targetMonth, 1);
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
     allIncomes.forEach(income => {
+      const incomeCreationDate = new Date(income.createdAt);
+      const creationMonthStart = new Date(incomeCreationDate.getFullYear(), incomeCreationDate.getMonth(), 1);
+
+      // Regra para receitas fixas:
       if (income.type === 'Fixo') {
-        totalIncome += income.value;
-      } else if (income.type === 'Ganho' && income.month === targetMonth && income.year === targetYear) {
-        totalIncome += income.value;
+        // Receita fixa só deve ser considerada se sua data de criação for no ou antes do mês exibido
+        // E se ela não foi excluída *antes* do mês exibido
+        const isCreatedBeforeOrInDisplayMonth = creationMonthStart.getTime() <= displayMonthStart.getTime();
+        
+        let isActiveInDisplayMonth = true;
+        if (income.status === 'inactive' && income.deletedAt) {
+          const deletionDate = new Date(income.deletedAt);
+          const deletionMonthStart = new Date(deletionDate.getFullYear(), deletionDate.getMonth(), 1);
+          
+          // Se a receita foi inativada ANTES ou NO MÊS exibido, ela NÃO é mais ativa
+          if (deletionMonthStart.getTime() <= displayMonthStart.getTime()) {
+            isActiveInDisplayMonth = false;
+          }
+        }
+
+        if (isCreatedBeforeOrInDisplayMonth && isActiveInDisplayMonth) {
+          totalIncome += income.value;
+        }
+      } 
+      // Regra para receitas de ganho:
+      else if (income.type === 'Ganho' && income.month === targetMonth && income.year === targetYear) {
+        // Receita de ganho é pontual, mas também respeita a exclusão suave
+        let isActiveInDisplayMonth = true;
+        if (income.status === 'inactive' && income.deletedAt) {
+          const deletionDate = new Date(income.deletedAt);
+          const deletionMonthStart = new Date(deletionDate.getFullYear(), deletionDate.getMonth(), 1);
+
+          // Se a receita foi inativada ANTES ou NO MÊS exibido, ela NÃO é mais ativa
+          // Para ganhos, se a data de exclusão é no mesmo mês do ganho, ela não conta.
+          if (deletionMonthStart.getTime() <= displayMonthStart.getTime()) {
+              isActiveInDisplayMonth = false;
+          }
+        }
+        if (isActiveInDisplayMonth) {
+          totalIncome += income.value;
+        }
       }
     });
     return totalIncome;

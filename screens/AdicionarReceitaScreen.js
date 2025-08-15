@@ -1,24 +1,24 @@
 // screens/AdicionarReceitaScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
-// Removido Picker, pois usaremos TouchableOpacity para seleção de tipo
-// import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// A prop `route` vem do React Navigation e contém `params`
 export default function AdicionarReceitaScreen({ navigation, route }) {
   const [loadingApp, setLoadingApp] = useState(false);
   
   const [incomeName, setIncomeName] = useState('');
   const [incomeValue, setIncomeValue] = useState('');
-  const [incomeType, setIncomeType] = useState('Fixo'); // 'Fixo' ou 'Ganho'
+  const [incomeType, setIncomeType] = useState('Fixo');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [savingIncome, setSavingIncome] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentIncomeId, setCurrentIncomeId] = useState(null);
+  // Novo estado para armazenar o status e deletedAt de uma receita em edição
+  const [currentIncomeStatus, setCurrentIncomeStatus] = useState(null);
+  const [currentIncomeDeletedAt, setCurrentIncomeDeletedAt] = useState(null);
 
   useEffect(() => {
     if (route.params?.incomeToEdit) {
@@ -28,6 +28,9 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
       setIncomeName(income.name);
       setIncomeValue(income.value.toFixed(2).replace('.', ','));
       setIncomeType(income.type);
+      setCurrentIncomeStatus(income.status || 'active'); // Garante que status seja 'active' se não definido
+      setCurrentIncomeDeletedAt(income.deletedAt || null); // Carrega deletedAt se existir
+
       if (income.type === 'Ganho' && income.month !== undefined && income.year !== undefined) {
         setSelectedDate(new Date(income.year, income.month, 1));
       } else {
@@ -38,8 +41,10 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
       setCurrentIncomeId(null);
       setIncomeName('');
       setIncomeValue('');
-      setIncomeType('Fixo'); // Padrão para nova receita
+      setIncomeType('Fixo');
       setSelectedDate(new Date());
+      setCurrentIncomeStatus('active'); // Nova receita sempre inicia como ativa
+      setCurrentIncomeDeletedAt(null);
     }
   }, [route.params?.incomeToEdit]);
 
@@ -77,16 +82,22 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
         name: incomeName.trim(),
         value: value,
         type: incomeType,
+        status: currentIncomeStatus || 'active', // Mantém o status existente ou define como 'active'
+        deletedAt: currentIncomeDeletedAt || null, // Mantém a data de exclusão existente ou null
       };
 
       if (incomeType === 'Ganho') {
         incomeData.month = selectedDate.getMonth();
         incomeData.year = selectedDate.getFullYear();
+      } else {
+        // Se mudar de 'Ganho' para 'Fixo', remove as propriedades de mês/ano para evitar inconsistência
+        delete incomeData.month;
+        delete incomeData.year;
       }
 
       if (isEditing && currentIncomeId) {
         incomeData.id = currentIncomeId;
-        incomeData.createdAt = route.params.incomeToEdit.createdAt;
+        incomeData.createdAt = route.params.incomeToEdit.createdAt; // Mantém a data de criação original
 
         const index = incomes.findIndex(inc => inc.id === currentIncomeId);
         if (index !== -1) {
@@ -113,6 +124,7 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
       } else {
         incomeData.id = Date.now().toString();
         incomeData.createdAt = new Date().toISOString();
+        incomeData.status = 'active'; // Garante que novas receitas são sempre ativas
 
         incomes.push(incomeData);
         await AsyncStorage.setItem('incomes', JSON.stringify(incomes));
@@ -135,6 +147,8 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
       setIncomeValue('');
       setIncomeType('Fixo');
       setSelectedDate(new Date());
+      setCurrentIncomeStatus('active');
+      setCurrentIncomeDeletedAt(null);
 
     } catch (error) {
       console.error("AdicionarReceitaScreen: Erro ao salvar receita no AsyncStorage:", error);
@@ -173,7 +187,6 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
         onChangeText={(text) => setIncomeValue(text.replace(/[^0-9,.]/g, '').replace('.', ','))}
       />
 
-      {/* NOVO: Seleção de Tipo 'Fixo' / 'Ganho' com botões */}
       <View style={styles.typeSelectionContainer}>
         <Text style={styles.pickerLabel}>Tipo de Receita:</Text>
         <View style={styles.typeButtonsWrapper}>
@@ -204,7 +217,6 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
       </View>
-      {/* FIM NOVO */}
 
       {incomeType === 'Ganho' && (
         <View style={styles.datePickerSection}>
@@ -270,50 +282,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 16,
   },
-  // Removido pickerContainer e picker, pois foram substituídos
-  // pickerContainer: {
-  //   borderColor: '#ccc',
-  //   borderWidth: 1,
-  //   borderRadius: 8,
-  //   marginBottom: 15,
-  //   backgroundColor: '#fff',
-  // },
-  // picker: {
-  //   height: 50,
-  //   width: '100%',
-  // },
   pickerLabel: {
     fontSize: 16,
     color: '#555',
-    paddingLeft: 0, // Ajustado para a nova estrutura
-    paddingTop: 0, // Ajustado para a nova estrutura
-    marginBottom: 10, // Espaçamento para os botões
+    paddingLeft: 0,
+    paddingTop: 0,
+    marginBottom: 10,
   },
-  // NOVOS ESTILOS PARA SELEÇÃO DE TIPO
   typeSelectionContainer: {
     marginBottom: 15,
   },
   typeButtonsWrapper: {
     flexDirection: 'row',
-    backgroundColor: '#e0e0e0', // Fundo para os botões não selecionados
+    backgroundColor: '#e0e0e0',
     borderRadius: 8,
-    overflow: 'hidden', // Para garantir que os cantos arredondados sejam respeitados
+    overflow: 'hidden',
   },
   typeButton: {
     flex: 1,
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8, // Arredondado para cada botão
-    margin: 2, // Pequeno espaçamento entre os botões para visual
+    borderRadius: 8,
+    margin: 2,
   },
   typeButtonSelected: {
-    backgroundColor: '#007bff', // Azul para selecionado
+    backgroundColor: '#007bff',
     borderColor: '#007bff',
     borderWidth: 1,
   },
   typeButtonUnselected: {
-    backgroundColor: '#ffffff', // Branco para não selecionado
+    backgroundColor: '#ffffff',
     borderColor: '#ccc',
     borderWidth: 1,
   },
@@ -322,12 +321,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   typeButtonTextSelected: {
-    color: '#fff', // Texto branco para selecionado
+    color: '#fff',
   },
   typeButtonTextUnselected: {
-    color: '#333', // Texto escuro para não selecionado
+    color: '#333',
   },
-  // FIM NOVOS ESTILOS
   datePickerSection: {
     marginBottom: 15,
   },
