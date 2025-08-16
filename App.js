@@ -1,6 +1,6 @@
 // App.js
 import React from 'react';
-import { Text } from 'react-native'; // Importar Text explicitamente
+import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,15 +9,17 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
-import ReceitaScreen from './screens/ReceitaScreen'; // Agora a tela de lista de receitas
-import AdicionarReceitaScreen from './screens/AdicionarReceitaScreen'; // Nova tela para adicionar receitas
+import ReceitaScreen from './screens/ReceitaScreen';
+import AdicionarReceitaScreen from './screens/AdicionarReceitaScreen';
 import DespesaScreen from './screens/DespesaScreen';
 import CartaoScreen from './screens/CartaoScreen';
+// Importa a nova tela de adição/edição de cartão
+import AdicionarCartaoScreen from './screens/AdicionarCartaoScreen'; 
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Stack para a tab "Receita" (para permitir navegação interna dentro da aba)
+// Stack para a tab "Receita"
 const ReceitaStack = createNativeStackNavigator();
 
 function ReceitaNavigator() {
@@ -29,24 +31,35 @@ function ReceitaNavigator() {
   );
 }
 
-// Componente que define as abas do rodapé
+// NOVO: Stack para a tab "Cartão"
+const CartaoStack = createNativeStackNavigator();
+
+function CartaoNavigator() {
+  return (
+    <CartaoStack.Navigator screenOptions={{ headerShown: false }}>
+      <CartaoStack.Screen name="ListaCartoes" component={CartaoScreen} />
+      <CartaoStack.Screen name="AdicionarCartao" component={AdicionarCartaoScreen} />
+    </CartaoStack.Navigator>
+  );
+}
+
 function HomeTabs() {
   const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false, // Esconde o cabeçalho das telas dentro das abas
+        headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
           if (route.name === 'Início') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'ReceitaTab') { // Rota da Tab para a ReceitaStack
+          } else if (route.name === 'ReceitaTab') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
           } else if (route.name === 'Despesa') {
             iconName = focused ? 'remove-circle' : 'remove-circle-outline';
-          } else if (route.name === 'Cartão') {
+          } else if (route.name === 'CartaoTab') { // Mudado para CartaoTab
             iconName = focused ? 'card' : 'card-outline';
           }
 
@@ -73,7 +86,7 @@ function HomeTabs() {
         options={{ tabBarLabel: () => <Text>Início</Text> }}
       />
       <Tab.Screen
-        name="ReceitaTab" // Usa o ReceitaNavigator para a navegação interna da aba "Receita"
+        name="ReceitaTab"
         component={ReceitaNavigator}
         options={{ tabBarLabel: () => <Text>Receita</Text> }}
       />
@@ -83,8 +96,8 @@ function HomeTabs() {
         options={{ tabBarLabel: () => <Text>Despesa</Text> }}
       />
       <Tab.Screen
-        name="Cartão"
-        component={CartaoScreen}
+        name="CartaoTab" // Usando o novo CartaoNavigator
+        component={CartaoNavigator}
         options={{ tabBarLabel: () => <Text>Cartão</Text> }}
       />
     </Tab.Navigator>
