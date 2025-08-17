@@ -4,8 +4,12 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, 
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
+
 
 export default function CartaoScreen({ navigation }) {
+  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+
   const [loadingApp, setLoadingApp] = useState(true);
   const [cards, setCards] = useState([]);
   const [isActionModalVisible, setIsActionModalVisible] = useState(false);
@@ -126,7 +130,7 @@ export default function CartaoScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={styles.title}>Meus Cartões</Text>
       {cards.length > 0 ? (
         <FlatList
@@ -199,7 +203,7 @@ export default function CartaoScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20, // Mantido padding horizontal
     backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
@@ -269,8 +273,8 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 5,
   },
-  // Estilos do Modal (reutilizados do ReceitaScreen, com pequenas adaptações se necessário)
-  centeredView: {
+    // Estilos do Modal (reutilizados do ReceitaScreen, com pequenas adaptações se necessário)
+    centeredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',

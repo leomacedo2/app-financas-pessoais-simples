@@ -1,10 +1,14 @@
 // screens/DespesaScreen.js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
+
 
 export default function DespesaScreen() {
+  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={styles.text}>Tela de Despesa (em construção)</Text>
       <Text style={styles.info}>Aqui você poderá registrar suas despesas.</Text>
     </View>

@@ -4,8 +4,11 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, 
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
 
 export default function ReceitaScreen({ navigation }) {
+  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+
   const [loadingApp, setLoadingApp] = useState(true);
   const [incomes, setIncomes] = useState([]);
   const [isActionModalVisible, setIsActionModalVisible] = useState(false);
@@ -39,7 +42,9 @@ export default function ReceitaScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadIncomes();
-      return () => {};
+      return () => {
+        // Opcional: Lógica de limpeza se necessário ao desfocar
+      };
     }, [loadIncomes])
   );
 
@@ -131,7 +136,7 @@ export default function ReceitaScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={styles.title}>Minhas Receitas</Text>
       {incomes.length > 0 ? (
         <FlatList
@@ -204,7 +209,7 @@ export default function ReceitaScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20, // Mantido padding horizontal
     backgroundColor: '#f5f5f5',
   },
   loadingContainer: {

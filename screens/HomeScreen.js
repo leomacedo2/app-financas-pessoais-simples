@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
 
 // Funções auxiliares para manipulação de datas
 const { width } = Dimensions.get('window');
@@ -29,7 +30,6 @@ const getMonthName = (date) => {
   return monthNames[d.getMonth()];
 };
 
-// Modificado para 12 meses anteriores e 12 meses posteriores
 const generateMonthsToDisplay = () => {
   const today = new Date();
   const months = [];
@@ -70,7 +70,7 @@ const generateInitialExpenses = (monthsToDisplay) => {
         description,
         value,
         createdAt: createdAtDate.toISOString(),
-        status: 'active', // Despesas iniciais também são ativas
+        status: 'active',
       });
     }
   });
@@ -79,6 +79,8 @@ const generateInitialExpenses = (monthsToDisplay) => {
 
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+
   const [loadingApp, setLoadingApp] = useState(true);
   const [allIncomes, setAllIncomes] = useState([]);
   const [allExpenses, setAllExpenses] = useState([]);
@@ -106,7 +108,7 @@ export default function HomeScreen() {
 
       // Despesas aparecem no mês em que foram criadas
       const isExpenseRelevantToMonth = itemMonth === targetMonth && itemYear === targetYear;
-
+      
       // Lógica de exclusão suave para despesas (futuramente)
       // Por enquanto, consideramos todas as despesas geradas ativas
       // Futuramente: if (item.status === 'inactive' && new Date(item.deletedAt).getTime() <= monthDateTimestamp) { return false; }
@@ -179,8 +181,7 @@ export default function HomeScreen() {
 
     // Converte o mês exibido para um objeto Date no primeiro dia do mês
     const displayMonthStart = new Date(targetYear, targetMonth, 1);
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
+    
     allIncomes.forEach(income => {
       const incomeCreationDate = new Date(income.createdAt);
       const creationMonthStart = new Date(incomeCreationDate.getFullYear(), incomeCreationDate.getMonth(), 1);
@@ -293,7 +294,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <FlatList
         ref={flatListRef}
         data={monthsToDisplay}
@@ -344,7 +345,7 @@ const styles = StyleSheet.create({
   monthPage: {
     width: width,
     paddingHorizontal: 15,
-    paddingTop: 15,
+    paddingTop: 15, // Já existe, mas o padding do container superior fará a diferença
   },
   section: {
     backgroundColor: '#ffffff',

@@ -1,17 +1,21 @@
 // screens/AdicionarCartaoScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Picker } from '@react-native-picker/picker'; // Para o seletor de dia
+import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
+
 
 export default function AdicionarCartaoScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+
   const [cardAlias, setCardAlias] = useState('');
   const [dueDayOfMonth, setDueDayOfMonth] = useState('1'); // Dia do vencimento, como string para o Picker
   const [savingCard, setSavingCard] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentCardId, setCurrentCardId] = useState(null);
-  const [currentCardStatus, setCurrentCardStatus] = useState('active'); // Status padrão
+  const [currentCardStatus, setCurrentCardStatus] = useState('active');
 
   // useEffect para preencher o formulário se for uma edição
   useEffect(() => {
@@ -20,13 +24,13 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
       setIsEditing(true);
       setCurrentCardId(card.id);
       setCardAlias(card.alias);
-      setDueDayOfMonth(String(card.dueDayOfMonth)); // Converte para string para o Picker
+      setDueDayOfMonth(String(card.dueDayOfMonth));
       setCurrentCardStatus(card.status || 'active');
     } else {
       setIsEditing(false);
       setCurrentCardId(null);
       setCardAlias('');
-      setDueDayOfMonth('1'); // Reinicia para o dia 1 para nova adição
+      setDueDayOfMonth('1');
       setCurrentCardStatus('active');
     }
   }, [route.params?.cardToEdit]);
@@ -111,7 +115,7 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={styles.title}>{isEditing ? "Editar Cartão" : "Adicionar Novo Cartão"}</Text>
 
       <TextInput
@@ -150,7 +154,7 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20, // Mantido padding horizontal
     backgroundColor: '#f5f5f5',
   },
   title: {

@@ -3,8 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
+
 
 export default function AdicionarReceitaScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+
   const [loadingApp, setLoadingApp] = useState(false);
   
   const [incomeName, setIncomeName] = useState('');
@@ -98,7 +102,7 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
       if (isEditing && currentIncomeId) {
         incomeData.id = currentIncomeId;
         incomeData.createdAt = route.params.incomeToEdit.createdAt; // Mantém a data de criação original
-
+        
         const index = incomes.findIndex(inc => inc.id === currentIncomeId);
         if (index !== -1) {
           incomes[index] = incomeData;
@@ -169,7 +173,7 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={styles.title}>{isEditing ? "Editar Receita" : "Adicionar Nova Receita"}</Text>
 
       <TextInput
@@ -256,7 +260,7 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20, // Mantido padding horizontal
     backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
