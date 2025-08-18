@@ -4,7 +4,12 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, 
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Importa os estilos comuns para reutilização
+import commonStyles from '../utils/commonStyles';
+// Importa as chaves de AsyncStorage como constantes
+import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 
 export default function ReceitaScreen({ navigation }) {
   const insets = useSafeAreaInsets(); // Obter os insets da área segura
@@ -12,50 +17,71 @@ export default function ReceitaScreen({ navigation }) {
   const [loadingApp, setLoadingApp] = useState(true);
   const [incomes, setIncomes] = useState([]);
   const [isActionModalVisible, setIsActionModalVisible] = useState(false);
-  const [selectedIncome, setSelectedIncome] = useState(null);
+  const [selectedIncome, setSelectedIncome] = useState(null); // Para guardar a receita selecionada
 
+  /**
+   * Função para carregar as receitas do AsyncStorage.
+   * Filtra apenas as receitas ativas para exibição na lista principal.
+   */
   const loadIncomes = useCallback(async () => {
     setLoadingApp(true);
     try {
-      const storedIncomesJson = await AsyncStorage.getItem('incomes');
+      // Tenta obter as receitas armazenadas
+      const storedIncomesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.INCOMES);
+      // Se houver receitas, faz o parse; caso contrário, inicializa um array vazio
       const storedIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
       
-      // Filtra para exibir apenas receitas ativas na lista (no ReceitaScreen)
+      // Filtra para exibir apenas receitas ativas na lista (status diferente de 'inactive')
       const activeIncomes = storedIncomes.filter(income => income.status !== 'inactive');
 
+      // Ordena as receitas ativas pela data de criação, da mais recente para a mais antiga
       const sortedIncomes = activeIncomes.sort((a, b) => {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
         return dateB.getTime() - dateA.getTime();
       });
 
-      setIncomes(sortedIncomes);
+      setIncomes(sortedIncomes); // Atualiza o estado com as receitas filtradas e ordenadas
       console.log("Receitas carregadas (ativas) do AsyncStorage. Total:", sortedIncomes.length);
     } catch (error) {
       console.error("Erro ao carregar receitas do AsyncStorage:", error);
       Alert.alert('Erro', 'Não foi possível carregar as receitas do armazenamento local.');
     } finally {
-      setLoadingApp(false);
+      setLoadingApp(false); // Finaliza o estado de carregamento
     }
-  }, []);
+  }, []); // Dependências vazias garantem que a função só seja recriada uma vez
 
+  /**
+   * Hook para recarregar os dados da tela sempre que ela entra em foco.
+   * Garante que a lista de receitas esteja sempre atualizada.
+   */
   useFocusEffect(
     useCallback(() => {
-      loadIncomes();
+      loadIncomes(); // Chama a função de carregamento
       return () => {
-        // Opcional: Lógica de limpeza se necessário ao desfocar
+        // Opcional: Lógica de limpeza se necessário ao desfocar a tela
       };
-    }, [loadIncomes])
+    }, [loadIncomes]) // Depende de loadIncomes para ser reexecutado se loadIncomes mudar
   );
 
+  /**
+   * Lida com o toque longo em um item da receita, abrindo o modal de ações.
+   * @param {object} income - O objeto da receita selecionada.
+   */
   const handleLongPressIncome = (income) => {
-    setSelectedIncome(income);
-    setIsActionModalVisible(true);
+    setSelectedIncome(income); // Define a receita selecionada
+    setIsActionModalVisible(true); // Abre o modal de ações
   };
 
+  /**
+   * Lida com a exclusão de uma receita. Implementa "exclusão suave" (soft delete).
+   * A receita é marcada como 'inactive' e uma data de exclusão é registrada,
+   * em vez de ser removida permanentemente do armazenamento.
+   */
   const handleDeleteIncome = async () => {
-    if (!selectedIncome) return;
+    if (!selectedIncome) return; // Se nenhuma receita estiver selecionada, sai da função
 
+    // Confirmação com o usuário antes de prosseguir com a exclusão
     Alert.alert(
       "Confirmar Exclusão",
       `Tem certeza que deseja excluir a receita "${selectedIncome.name}"? (Ela será removida dos meses futuros)`,
@@ -63,30 +89,33 @@ export default function ReceitaScreen({ navigation }) {
         {
           text: "Cancelar",
           style: "cancel",
-          onPress: () => setIsActionModalVisible(false)
+          onPress: () => setIsActionModalVisible(false) // Fecha o modal ao cancelar
         },
         {
           text: "Excluir",
           onPress: async () => {
             try {
-              const existingIncomesJson = await AsyncStorage.getItem('incomes');
+              // Obtém todas as receitas existentes do AsyncStorage
+              const existingIncomesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.INCOMES);
               let incomesArray = existingIncomesJson ? JSON.parse(existingIncomesJson) : [];
               
+              // Mapeia o array de receitas, atualizando o status e deletedAt da receita selecionada
               const updatedIncomesArray = incomesArray.map(income => {
                 if (income.id === selectedIncome.id) {
                   return {
                     ...income,
-                    status: 'inactive', // Marcar como inativo
-                    deletedAt: new Date().toISOString(), // Registrar data de exclusão
+                    status: 'inactive', // Marca a receita como inativa
+                    deletedAt: new Date().toISOString(), // Registra a data/hora da exclusão
                   };
                 }
-                return income;
+                return income; // Retorna as outras receitas inalteradas
               });
 
-              await AsyncStorage.setItem('incomes', JSON.stringify(updatedIncomesArray));
-              loadIncomes(); // Recarrega a lista para mostrar apenas as ativas
-              setIsActionModalVisible(false);
-              setSelectedIncome(null);
+              // Salva o array atualizado de volta no AsyncStorage
+              await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.INCOMES, JSON.stringify(updatedIncomesArray));
+              loadIncomes(); // Recarrega a lista de receitas (filtrará as inativas para exibição)
+              setIsActionModalVisible(false); // Fecha o modal de ações
+              setSelectedIncome(null); // Limpa a receita selecionada
               Alert.alert('Sucesso', 'Receita excluída com sucesso! (Não aparecerá mais nos meses atuais/futuros)');
               console.log("Receita marcada como inativa no AsyncStorage.");
             } catch (error) {
@@ -99,36 +128,49 @@ export default function ReceitaScreen({ navigation }) {
     );
   };
 
+  /**
+   * Lida com a edição de uma receita. Navega para a tela AdicionarReceitaScreen,
+   * passando os dados da receita selecionada para pré-preenchimento do formulário.
+   */
   const handleEditIncome = () => {
-    setIsActionModalVisible(false);
+    setIsActionModalVisible(false); // Fecha o modal de ações
     if (selectedIncome) {
       navigation.navigate('AdicionarReceita', { incomeToEdit: selectedIncome });
     }
   };
 
+  /**
+   * Renderiza cada item da lista de receitas.
+   * @param {object} item - O objeto da receita a ser renderizada.
+   */
   const renderIncomeItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.incomeItem}
-      onLongPress={() => handleLongPressIncome(item)}
+      style={styles.incomeItem} // Estilo para o item individual da receita
+      onLongPress={() => handleLongPressIncome(item)} // Ativa o modal de ações com toque longo
     >
       <Text style={styles.incomeName}>{item.name}</Text>
       <View style={styles.incomeDetails}>
+        {/* Exibe o tipo da receita */}
         <Text style={styles.incomeType}>{item.type === 'Fixo' ? 'Fixo' : 'Ganho Pontual'}</Text>
+        {/* Exibe o mês/ano para receitas do tipo 'Ganho' */}
         {item.type === 'Ganho' && item.month !== undefined && item.year !== undefined && (
           <Text style={styles.incomeDate}>
+            {/* Mês + 1 pois é 0-indexado em JavaScript */}
             {`${(item.month + 1).toString().padStart(2, '0')}/${item.year}`}
           </Text>
         )}
       </View>
+      {/* Exibe o valor da receita formatado */}
       <Text style={styles.incomeValue}>
         {`${item.value.toFixed(2).replace('.', ',')} R$`}
       </Text>
     </TouchableOpacity>
   );
 
+  // Exibe um indicador de carregamento enquanto os dados estão sendo carregados
   if (loadingApp) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={commonStyles.loadingContainer}>
         <ActivityIndicator size="large" color="#007bff" />
         <Text>Carregando suas receitas do armazenamento local...</Text>
       </View>
@@ -136,22 +178,26 @@ export default function ReceitaScreen({ navigation }) {
   }
 
   return (
+    // Aplica o padding superior para respeitar a barra de notificação do dispositivo
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Text style={styles.title}>Minhas Receitas</Text>
+      <Text style={commonStyles.title}>Minhas Receitas</Text>
       {incomes.length > 0 ? (
+        // Renderiza a lista de receitas se houver itens
         <FlatList
           data={incomes}
           renderItem={renderIncomeItem}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.listContent} // Estilo para o conteúdo do FlatList
         />
       ) : (
-        <Text style={styles.noIncomesText}>Nenhuma receita adicionada ainda. Adicione uma!</Text>
+        // Exibe uma mensagem se não houver receitas
+        <Text style={commonStyles.noItemsText}>Nenhuma receita adicionada ainda. Adicione uma!</Text>
       )}
 
+      {/* Botão flutuante para adicionar nova receita */}
       <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => navigation.navigate('AdicionarReceita')}
+        style={styles.addButton} // Estilo específico para o botão flutuante nesta tela
+        onPress={() => navigation.navigate('AdicionarReceita')} // Navega para a tela de adicionar
       >
         <Ionicons name="add" size={30} color="#fff" />
       </TouchableOpacity>
@@ -163,41 +209,43 @@ export default function ReceitaScreen({ navigation }) {
         visible={isActionModalVisible}
         onRequestClose={() => {
           setIsActionModalVisible(!isActionModalVisible);
-          setSelectedIncome(null);
+          setSelectedIncome(null); // Limpa a seleção ao fechar
         }}
       >
+        {/* Área que pode ser tocada fora do modal para fechá-lo */}
         <Pressable
-          style={styles.centeredView}
+          style={commonStyles.centeredView}
           onPressOut={() => {
             setIsActionModalVisible(false);
             setSelectedIncome(null);
           }}
         >
-          <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>Ações para "{selectedIncome?.name}"</Text>
+          {/* Conteúdo do modal */}
+          <View style={commonStyles.modalView}>
+            <Text style={commonStyles.modalTitle}>Ações para "{selectedIncome?.name}"</Text>
             
             <TouchableOpacity
-              style={[styles.modalButton, styles.buttonEdit]}
+              style={[commonStyles.modalButton, commonStyles.buttonEdit]}
               onPress={handleEditIncome}
             >
-              <Text style={styles.buttonTextStyle}>Editar</Text>
+              <Text style={commonStyles.buttonTextStyle}>Editar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.modalButton, styles.buttonDelete]}
+              style={[commonStyles.modalButton, commonStyles.buttonDelete]}
               onPress={handleDeleteIncome}
             >
-              <Text style={styles.buttonTextStyle}>Excluir</Text>
+              <Text style={commonStyles.buttonTextStyle}>Excluir</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.modalButton, styles.buttonClose]}
+              style={[commonStyles.modalButton, commonStyles.buttonClose]}
               onPress={() => {
                 setIsActionModalVisible(false);
                 setSelectedIncome(null);
               }}
             >
-              <Text style={styles.buttonTextStyle}>Cancelar</Text>
+              <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -207,26 +255,18 @@ export default function ReceitaScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  // Combina o container base dos estilos comuns com padding horizontal específico para esta tela
   container: {
-    flex: 1,
-    paddingHorizontal: 20, // Mantido padding horizontal
-    backgroundColor: '#f5f5f5',
+    ...commonStyles.container,
+    paddingHorizontal: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
+  // Sobrescreve o título para marginBottom específico desta tela se necessário
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
+    ...commonStyles.title,
+    marginBottom: 20, // Título da lista tem menos espaço que os formulários
   },
   listContent: {
-    paddingBottom: 80,
+    paddingBottom: 80, // Espaço para o botão de adição flutuante
   },
   incomeItem: {
     backgroundColor: '#ffffff',
@@ -246,10 +286,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    flex: 2,
+    flex: 2, // Ocupa mais espaço para o nome
   },
   incomeDetails: {
-    flex: 1.5,
+    flex: 1.5, // Ajusta o espaço para tipo e data
     alignItems: 'flex-start',
     marginLeft: 10,
   },
@@ -264,81 +304,18 @@ const styles = StyleSheet.create({
   incomeValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#28a745',
+    color: '#28a745', // Verde para receitas
     flex: 1,
     textAlign: 'right',
   },
-  noIncomesText: {
-    textAlign: 'center',
-    marginTop: 50,
-    fontSize: 16,
-    color: '#888',
-  },
+  // Estilo específico para o botão de adição flutuante (posição absoluta)
   addButton: {
+    ...commonStyles.addButton, // Reutiliza o estilo base do botão
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#007bff',
-    borderRadius: 30,
     width: 60,
     height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalView: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 35,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: '80%',
-  },
-  modalTitle: {
-    marginBottom: 20,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalButton: {
-    borderRadius: 10,
-    padding: 15,
-    elevation: 2,
-    width: '100%',
-    marginBottom: 10,
-  },
-  buttonEdit: {
-    backgroundColor: '#2196F3',
-  },
-  buttonDelete: {
-    backgroundColor: '#f44336',
-  },
-  buttonClose: {
-    backgroundColor: '#9e9e9e',
-  },
-  buttonTextStyle: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    fontSize: 16,
+    borderRadius: 30, // Transforma em círculo
   },
 });
