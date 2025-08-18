@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Button } from 'react-native'; // Usando Button por sua preferência
 import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets para lidar com a barra de status
 
 export default function LoginScreen({ navigation }) {
@@ -23,7 +23,7 @@ export default function LoginScreen({ navigation }) {
    * Futuramente, aqui poderia ser implementada uma lógica de autenticação
    * como biometria, PIN do celular, ou um sistema de login mais robusto.
    */
-  const handleLogin = () => {
+  const fazerLogin = () => {
     // Navega para a rota 'Home', que contém o navegador de abas principal
     navigation.navigate('Home');
   };
@@ -35,14 +35,9 @@ export default function LoginScreen({ navigation }) {
       {/* Título do aplicativo */}
       <Text style={styles.titulo}>💰 Finanças Simples</Text>
       
-      {/* Botão para "Entrar" no aplicativo */}
-      {/* Foi usado TouchableOpacity no lugar de Button para maior flexibilidade de estilo */}
-      <TouchableOpacity
-        style={styles.loginButton} // Estilo do botão
-        onPress={handleLogin}     // Função a ser chamada ao pressionar
-      >
-        <Text style={styles.buttonText}>Entrar</Text> {/* Texto do botão */}
-      </TouchableOpacity>
+      {/* Botão "Entrar" */}
+      {/* Usando o componente Button do React Native */}
+      <Button title="Entrar" onPress={fazerLogin} />
     </View>
   );
 }
@@ -57,25 +52,6 @@ const styles = StyleSheet.create({
   titulo: {
     fontSize: 26, // Tamanho da fonte do título
     marginBottom: 20, // Espaçamento abaixo do título
-    fontWeight: 'bold', // Texto em negrito
-  },
-  loginButton: {
-    backgroundColor: '#007bff', // Cor de fundo azul para o botão
-    paddingVertical: 15, // Espaçamento vertical interno
-    paddingHorizontal: 30, // Espaçamento horizontal interno
-    borderRadius: 8, // Bordas arredondadas
-    alignItems: 'center', // Centraliza o conteúdo (texto) do botão
-    justifyContent: 'center', // Centraliza o conteúdo (texto) do botão
-    marginTop: 20, // Espaçamento acima do botão
-    shadowColor: '#000', // Cor da sombra
-    shadowOffset: { width: 0, height: 4 }, // Deslocamento da sombra
-    shadowOpacity: 0.3, // Opacidade da sombra
-    shadowRadius: 5, // Raio da sombra
-    elevation: 5, // Elevação para Android (simula sombra)
-  },
-  buttonText: {
-    color: '#fff', // Cor do texto do botão (branco)
-    fontSize: 18, // Tamanho da fonte do texto do botão
     fontWeight: 'bold', // Texto em negrito
   },
 });

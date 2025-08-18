@@ -29,6 +29,7 @@ const Tab = createBottomTabNavigator(); // Cria uma instância do Bottom Tab Nav
  * Componente que define a pilha de navegação para a aba "Receita".
  * Permite navegar entre a lista de receitas e a tela de adicionar/editar receita.
  */
+const ReceitaStack = createNativeStackNavigator(); // Definido fora da função para evitar recriação
 function ReceitaNavigator() {
   return (
     <ReceitaStack.Navigator screenOptions={{ headerShown: false }}>
@@ -40,10 +41,11 @@ function ReceitaNavigator() {
   );
 }
 
-// NOVO: Componente que define a pilha de navegação para a aba "Cartão".
-// Permite navegar entre a lista de cartões e a tela de adicionar/editar cartão.
-const CartaoStack = createNativeStackNavigator();
-
+/**
+ * Componente que define a pilha de navegação para a aba "Cartão".
+ * Permite navegar entre a lista de cartões e a tela de adicionar/editar cartão.
+ */
+const CartaoStack = createNativeStackNavigator(); // Definido fora da função para evitar recriação
 function CartaoNavigator() {
   return (
     <CartaoStack.Navigator screenOptions={{ headerShown: false }}>

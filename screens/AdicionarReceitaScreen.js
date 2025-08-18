@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
 
-// Importa os estilos comuns para reutilização
+
+// Importa os estilos comuns e as constantes para reutilização
 import commonStyles from '../utils/commonStyles';
-// Importa as chaves de AsyncStorage como constantes
 import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 
 
@@ -132,7 +132,7 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
         // --- Lógica para EDIÇÃO de Receita ---
         incomeData.id = currentIncomeId; // Mantém o mesmo ID para atualização
         incomeData.createdAt = route.params.incomeToEdit.createdAt; // Mantém a data de criação original
-
+        
         // Encontra o índice da receita a ser editada no array
         const index = incomes.findIndex(inc => inc.id === currentIncomeId);
         if (index !== -1) {
