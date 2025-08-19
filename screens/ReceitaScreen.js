@@ -1,10 +1,17 @@
 // screens/ReceitaScreen.js
+
+/**
+ * @file Tela para exibir e gerenciar as receitas cadastradas.
+ * Permite ao usuário visualizar suas receitas, editar detalhes de uma receita
+ * ou excluí-la (exclusão suave). Suporta rolagem vertical se houver muitas receitas.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert, Modal, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons'; // Para os ícones
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Para armazenamento local
+import { useFocusEffect } from '@react-navigation/native'; // Hook para recarregar dados ao focar na tela
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Para lidar com a área segura
 
 // Importa os estilos comuns para reutilização
 import commonStyles from '../utils/commonStyles';
@@ -14,17 +21,17 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 export default function ReceitaScreen({ navigation }) {
   const insets = useSafeAreaInsets(); // Obter os insets da área segura
 
-  const [loadingApp, setLoadingApp] = useState(true);
-  const [incomes, setIncomes] = useState([]);
-  const [isActionModalVisible, setIsActionModalVisible] = useState(false);
-  const [selectedIncome, setSelectedIncome] = useState(null); // Para guardar a receita selecionada
+  const [loadingApp, setLoadingApp] = useState(true); // Controla o carregamento da lista
+  const [incomes, setIncomes] = useState([]); // Estado para armazenar a lista de receitas
+  const [isActionModalVisible, setIsActionModalVisible] = useState(false); // Controla a visibilidade do modal de ações
+  const [selectedIncome, setSelectedIncome] = useState(null); // Para guardar a receita selecionada para ações
 
   /**
    * Função para carregar as receitas do AsyncStorage.
    * Filtra apenas as receitas ativas para exibição na lista principal.
    */
   const loadIncomes = useCallback(async () => {
-    setLoadingApp(true);
+    setLoadingApp(true); // Ativa o estado de carregamento
     try {
       // Tenta obter as receitas armazenadas
       const storedIncomesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.INCOMES);
@@ -179,10 +186,12 @@ export default function ReceitaScreen({ navigation }) {
 
   return (
     // Aplica o padding superior para respeitar a barra de notificação do dispositivo
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[commonStyles.container, { paddingTop: insets.top }]}>
+      {/* Título da tela, fixo no topo */}
       <Text style={commonStyles.title}>Minhas Receitas</Text>
+      
       {incomes.length > 0 ? (
-        // Renderiza a lista de receitas se houver itens
+        // Renderiza a lista de receitas usando FlatList
         <FlatList
           data={incomes}
           renderItem={renderIncomeItem}
@@ -196,7 +205,7 @@ export default function ReceitaScreen({ navigation }) {
 
       {/* Botão flutuante para adicionar nova receita */}
       <TouchableOpacity
-        style={styles.addButton} // Estilo específico para o botão flutuante nesta tela
+        style={commonStyles.addButton} // Usa o estilo comum de botão flutuante
         onPress={() => navigation.navigate('AdicionarReceita')} // Navega para a tela de adicionar
       >
         <Ionicons name="add" size={30} color="#fff" />
@@ -255,18 +264,17 @@ export default function ReceitaScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  // Combina o container base dos estilos comuns com padding horizontal específico para esta tela
   container: {
-    ...commonStyles.container,
-    paddingHorizontal: 20,
+    ...commonStyles.container, // Herda o estilo base
+    paddingHorizontal: 20, // Padding lateral específico para a lista de receitas
   },
-  // Sobrescreve o título para marginBottom específico desta tela se necessário
-  title: {
-    ...commonStyles.title,
-    marginBottom: 20, // Título da lista tem menos espaço que os formulários
-  },
+  // O título já está com estilo em commonStyles.title, mas você pode sobrescrever se precisar de algo específico
+  // title: {
+  //   ...commonStyles.title,
+  //   marginBottom: 20,
+  // },
   listContent: {
-    paddingBottom: 80, // Espaço para o botão de adição flutuante
+    paddingBottom: 80, // Espaço para o botão de adição flutuante na parte inferior
   },
   incomeItem: {
     backgroundColor: '#ffffff',
@@ -308,14 +316,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-  // Estilo específico para o botão de adição flutuante (posição absoluta)
-  addButton: {
-    ...commonStyles.addButton, // Reutiliza o estilo base do botão
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30, // Transforma em círculo
-  },
+  // O 'addButton' já vêm de commonStyles.
+  // Você pode sobrescrever aqui se precisar de um estilo muito específico.
 });

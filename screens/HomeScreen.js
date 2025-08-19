@@ -1,6 +1,6 @@
 // screens/HomeScreen.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,8 +34,8 @@ const formatDateForDisplay = (date) => {
   const day = d.getDate().toString().padStart(2, '0');
   const month = (d.getMonth() + 1).toString().padStart(2, '0'); // Mês + 1 para exibir corretamente
   const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
-};
+  return `${day}/${month}/${year}`;}
+;
 
 /**
  * Retorna o nome do mês de um objeto Date em português.
@@ -144,7 +144,8 @@ export default function HomeScreen() {
 
     // Filtra as despesas que correspondem ao mês e ano alvo
     return allExpenses.filter(item => {
-      const itemDate = new Date(item.createdAt);
+      // Usamos item.createdAt para despesas simuladas. No futuro, usaremos item.dueDate.
+      const itemDate = new Date(item.createdAt); 
       const itemMonth = itemDate.getMonth();
       const itemYear = itemDate.getFullYear();
 
@@ -231,7 +232,7 @@ export default function HomeScreen() {
     } else if (flatListRef.current === null) {
         console.log("HomeScreen: Não rolou para o initialScrollIndex. flatListRef.current é null.");
     } else {
-        console.log("HomeScreen: Não rolou para o initialScrollIndex. Condições: initialScrollIndex:", initialScrollIndex, "loadingApp:", loadingApp, "hasScrolled:", hasScrolled);
+        console.log("HomeScreen: Não rolou para o initialScrollIndex. Condições: initialScrollIndex: ", initialScrollIndex, "loadingApp: ", loadingApp, "hasScrolled: ", hasScrolled);
     }
   }, [initialScrollIndex, loadingApp, hasScrolled]); // Dependências do efeito
 
@@ -324,25 +325,30 @@ export default function HomeScreen() {
           styles.section,
           isSystemCurrentMonth && styles.currentMonthHighlight // Aplica destaque se for o mês atual
         ]}>
-          <Text style={styles.sectionTitle}>{`${monthName} ${year}`}</Text>
+          {/* Título do mês, que deve permanecer fixo */}
+          <Text style={styles.sectionTitle}>{`${String(monthName)} ${String(year)}`}</Text>
 
+          {/* Cabeçalho da tabela de despesas, que deve permanecer fixo */}
           <View style={styles.tableHeader}>
             <Text style={[styles.headerText, styles.descriptionColumn]}>Despesa</Text>
             <Text style={[styles.headerText, styles.dateColumn]}>Data de Vencimento</Text>
             <Text style={[styles.headerText, styles.valueColumn]}>Valor</Text>
           </View>
 
+          {/* Adicionado ScrollView para permitir rolagem vertical da lista de despesas */}
           {expenses.length > 0 ? (
-            // Mapeia e renderiza cada despesa para o mês
-            expenses.map((item) => (
-              <View key={item.id} style={styles.debitItemRow}>
-                <Text style={[styles.debitText, styles.descriptionColumn]}>{item.description}</Text>
-                <Text style={[styles.debitText, styles.dateColumn]}>{formatDateForDisplay(new Date(item.createdAt))}</Text>
-                <Text style={[styles.debitValue, styles.valueColumn]}>
-                  {`${item.value.toFixed(2).replace('.', ',')} R$`}
-                </Text>
-              </View>
-            ))
+            <ScrollView style={styles.expensesScrollView}>
+              {expenses.map((item) => (
+                <View key={String(item.id)} style={styles.debitItemRow}>
+                  <Text style={[styles.debitText, styles.descriptionColumn]}>{String(item.description)}</Text>
+                  {/* Para despesas simuladas, usamos createdAt. Com despesas reais, usaríamos dueDate */}
+                  <Text style={[styles.debitText, styles.dateColumn]}>{String(formatDateForDisplay(new Date(item.createdAt)))}</Text> 
+                  <Text style={[styles.debitValue, styles.valueColumn]}>
+                    {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
           ) : (
             // Mensagem se não houver despesas para o mês
             <Text style={styles.noExpensesText}>Nenhuma despesa para este mês.</Text>
@@ -383,7 +389,7 @@ export default function HomeScreen() {
         ref={flatListRef}
         data={monthsToDisplay} // Dados: array de meses
         renderItem={renderMonthSection} // Componente para renderizar cada mês
-        keyExtractor={(item, index) => index.toString()} // Chave única para cada item
+        keyExtractor={item => String(item.toISOString())} // Chave única para cada item (ISO string da data do mês)
         horizontal // Habilita rolagem horizontal
         pagingEnabled // Faz a rolagem "parar" em cada página (mês)
         showsHorizontalScrollIndicator={false} // Esconde a barra de rolagem horizontal
@@ -403,14 +409,14 @@ export default function HomeScreen() {
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Receita total:</Text>
           <Text style={styles.summaryValue}>
-            {`${currentMonthTotalIncome.toFixed(2).replace('.', ',')} R$`}
+            {`${String(currentMonthTotalIncome.toFixed(2)).replace('.', ',')} R$`}
           </Text>
         </View>
         {/* Linha para Valor Final (Receita - Despesa) */}
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Valor final:</Text>
           <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
-            {valorFinalDisplayedMonth.toFixed(2).replace('.', ',') + ' R$'}
+            {String(valorFinalDisplayedMonth.toFixed(2)).replace('.', ',') + ' R$'}
           </Text>
         </View>
       </View>
@@ -438,7 +444,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
-    minHeight: 250, // Altura mínima para a seção de despesas
+    // Remover minHeight: 250 se a seção se ajustar ao conteúdo dinamicamente
+    // e flex: 1 para que o ScrollView interno possa ter uma altura definida
+    flex: 1, 
   },
   currentMonthHighlight: {
     backgroundColor: 'lightblue',
@@ -469,6 +477,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  expensesScrollView: { // Novo estilo para o ScrollView das despesas
+    flex: 1, // <--- PRINCIPAL MUDANÇA AQUI: Ocupa o restante do espaço na seção
   },
   debitItemRow: {
     flexDirection: 'row',

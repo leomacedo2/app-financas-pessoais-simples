@@ -1,10 +1,17 @@
 // screens/CartaoScreen.js
+
+/**
+ * @file Tela para exibir e gerenciar os cartões cadastrados.
+ * Permite ao usuário visualizar seus cartões, editar detalhes de um cartão
+ * ou excluí-lo (exclusão suave). Suporta rolagem vertical se houver muitos cartões.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert, Modal, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons'; // Para os ícones
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Para armazenamento local
+import { useFocusEffect } from '@react-navigation/native'; // Hook para recarregar dados ao focar na tela
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Para lidar com a área segura
 
 // Importa os estilos comuns para reutilização
 import commonStyles from '../utils/commonStyles';
@@ -15,10 +22,10 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 export default function CartaoScreen({ navigation }) {
   const insets = useSafeAreaInsets(); // Obter os insets da área segura
 
-  const [loadingApp, setLoadingApp] = useState(true); // Estado para controlar o carregamento da tela
+  const [loadingApp, setLoadingApp] = useState(true); // Controla o carregamento da lista
   const [cards, setCards] = useState([]); // Estado para armazenar a lista de cartões
   const [isActionModalVisible, setIsActionModalVisible] = useState(false); // Controla a visibilidade do modal de ações
-  const [selectedCard, setSelectedCard] = useState(null); // Para guardar o cartão selecionado no modal
+  const [selectedCard, setSelectedCard] = useState(null); // Armazena o cartão selecionado para ações
 
   /**
    * Função para carregar os cartões do AsyncStorage.
@@ -27,15 +34,15 @@ export default function CartaoScreen({ navigation }) {
   const loadCards = useCallback(async () => {
     setLoadingApp(true); // Ativa o estado de carregamento
     try {
-      // Tenta obter os cartões armazenados
+      // Tenta obter os cartões armazenados no AsyncStorage
       const storedCardsJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.CARDS);
-      // Se houver cartões, faz o parse; caso contrário, inicializa um array vazio
+      // Se houver dados, faz o parse; caso contrário, inicializa um array vazio
       const storedCards = storedCardsJson ? JSON.parse(storedCardsJson) : [];
       
       // Filtra para exibir apenas cartões ativos (status diferente de 'inactive')
       const activeCards = storedCards.filter(card => card.status !== 'inactive');
 
-      // Opcional: ordena os cartões por apelido para uma lista mais organizada
+      // Opcional: ordenar cartões por apelido para uma lista mais organizada
       const sortedCards = activeCards.sort((a, b) => a.alias.localeCompare(b.alias));
 
       setCards(sortedCards); // Atualiza o estado com os cartões filtrados e ordenados
@@ -50,15 +57,15 @@ export default function CartaoScreen({ navigation }) {
 
   /**
    * Hook para recarregar os dados da tela sempre que ela entra em foco.
-   * Garante que a lista de cartões esteja sempre atualizada.
+   * Garante que a lista de cartões esteja sempre atualizada (ex: após adicionar/editar um cartão).
    */
   useFocusEffect(
     useCallback(() => {
       loadCards(); // Chama a função de carregamento
       return () => {
-        // Opcional: Lógica de limpeza se necessário ao desfocar
+        // Lógica de limpeza se necessário ao desfocar a tela (ex: listeners de dados)
       };
-    }, [loadCards]) // Depende de loadCards para ser reexecutado se loadCards mudar
+    }, [loadCards]) // Garante que o efeito seja reexecutado se 'loadCards' mudar
   );
 
   /**
@@ -168,10 +175,12 @@ export default function CartaoScreen({ navigation }) {
 
   return (
     // Aplica o padding superior para respeitar a barra de notificação do dispositivo
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[commonStyles.container, { paddingTop: insets.top }]}>
+      {/* Título da tela, fixo no topo */}
       <Text style={commonStyles.title}>Meus Cartões</Text>
+      
       {cards.length > 0 ? (
-        // Renderiza a lista de cartões se houver itens
+        // Renderiza a lista de cartões usando FlatList
         <FlatList
           data={cards}
           renderItem={renderCardItem}
@@ -185,13 +194,13 @@ export default function CartaoScreen({ navigation }) {
 
       {/* Botão flutuante para adicionar novo cartão */}
       <TouchableOpacity
-        style={styles.addButton} // Estilo específico para o botão flutuante nesta tela
+        style={commonStyles.addButton} // Usa o estilo comum de botão flutuante
         onPress={() => navigation.navigate('AdicionarCartao')} // Navega para a tela de adicionar cartão
       >
         <Ionicons name="add" size={30} color="#fff" />
       </TouchableOpacity>
 
-      {/* Modal para ações de Edição/Exclusão (reutiliza estilos comuns) */}
+      {/* Modal para ações de Edição/Exclusão */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -244,18 +253,18 @@ export default function CartaoScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  // Combina o container base dos estilos comuns com padding horizontal específico para esta tela
   container: {
-    ...commonStyles.container,
-    paddingHorizontal: 20,
+    ...commonStyles.container, // Herda o estilo base
+    paddingHorizontal: 20, // Padding lateral específico para a lista de cartões
+    // Não precisa de flex: 1 aqui, pois commonStyles.container já define.
   },
-  // Sobrescreve o título para marginBottom específico desta tela se necessário
-  title: {
-    ...commonStyles.title,
-    marginBottom: 20, // Título da lista tem menos espaço que os formulários
-  },
+  // O título já está com estilo em commonStyles.title, mas você pode sobrescrever se precisar de algo específico
+  // title: {
+  //   ...commonStyles.title,
+  //   marginBottom: 20,
+  // },
   listContent: {
-    paddingBottom: 80, // Espaço para o botão de adição flutuante
+    paddingBottom: 80, // Espaço para o botão de adição flutuante na parte inferior
   },
   cardItem: {
     backgroundColor: '#ffffff',
@@ -286,14 +295,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
   },
-  // Estilo específico para o botão de adição flutuante (posição absoluta)
-  addButton: {
-    ...commonStyles.addButton, // Reutiliza o estilo base do botão
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30, // Transforma em círculo
-  },
+  // O 'addButton' já vêm de commonStyles.
+  // Você pode sobrescrever aqui se precisar de um estilo muito específico.
 });
