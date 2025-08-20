@@ -1,6 +1,6 @@
 // screens/HomeScreen.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity } from 'react-native'; // Adicionado TouchableOpacity
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,8 +34,8 @@ const formatDateForDisplay = (date) => {
   const day = d.getDate().toString().padStart(2, '0');
   const month = (d.getMonth() + 1).toString().padStart(2, '0'); // Mês + 1 para exibir corretamente
   const year = d.getFullYear();
-  return `${day}/${month}/${year}`;}
-;
+  return `${day}/${month}/${year}`;
+};
 
 /**
  * Retorna o nome do mês de um objeto Date em português.
@@ -328,7 +328,7 @@ export default function HomeScreen() {
           {/* Título do mês, que deve permanecer fixo */}
           <Text style={styles.sectionTitle}>{`${String(monthName)} ${String(year)}`}</Text>
 
-          {/* Cabeçalho da tabela de despesas, que deve permanecer fixo */}
+          {/* Cabeçalho da Tabela */}
           <View style={styles.tableHeader}>
             <Text style={[styles.headerText, styles.descriptionColumn]}>Despesa</Text>
             <Text style={[styles.headerText, styles.dateColumn]}>Data de Vencimento</Text>
@@ -371,6 +371,36 @@ export default function HomeScreen() {
     }
   };
 
+  /**
+   * Limpa todos os dados de receitas, despesas e cartões do AsyncStorage.
+   * Usado para testes.
+   */
+  const clearAllData = async () => {
+    Alert.alert(
+      "Confirmar Limpeza",
+      "Tem certeza que deseja apagar TODOS os seus dados (receitas, despesas, cartões)? Esta ação é irreversível.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Apagar Tudo",
+          onPress: async () => {
+            try {
+              await AsyncStorage.clear(); // Limpa todo o AsyncStorage
+              await loadData(); // Recarrega os dados (irá gerar dados iniciais se não houver)
+              Alert.alert("Sucesso", "Todos os dados foram apagados e recarregados.");
+              console.log("AsyncStorage limpo e dados recarregados.");
+            } catch (error) {
+              console.error("Erro ao limpar AsyncStorage:", error);
+              Alert.alert("Erro", `Não foi possível limpar os dados: ${error.message}`);
+            }
+          },
+          style: "destructive", // Estilo para indicar uma ação destrutiva
+        },
+      ]
+    );
+  };
+
+
   // Exibe um indicador de carregamento enquanto o aplicativo está inicializando
   if (loadingApp) {
     return (
@@ -384,6 +414,11 @@ export default function HomeScreen() {
   return (
     // Container principal da tela, aplicando o padding superior para respeitar a barra de status
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Botão de Limpar Dados no topo da tela */}
+      <TouchableOpacity onPress={clearAllData} style={styles.clearDataButton}>
+        <Text style={styles.clearDataButtonText}>Limpar Todos os Dados</Text>
+      </TouchableOpacity>
+
       {/* FlatList para rolar entre os meses horizontalmente */}
       <FlatList
         ref={flatListRef}
@@ -428,6 +463,20 @@ const styles = StyleSheet.create({
   // Herda o estilo base do container dos commonStyles e adiciona estilos específicos.
   container: {
     ...commonStyles.container,
+  },
+  clearDataButton: {
+    backgroundColor: '#dc3545', // Vermelho para indicar perigo
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    alignSelf: 'center', // Centraliza o botão
+    marginTop: 10,
+    marginBottom: 15, // Espaçamento antes do FlatList
+  },
+  clearDataButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   monthPage: {
     width: width, // Cada página ocupa a largura total da tela
@@ -479,7 +528,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   expensesScrollView: { // Novo estilo para o ScrollView das despesas
-    flex: 1, // <--- PRINCIPAL MUDANÇA AQUI: Ocupa o restante do espaço na seção
+    flex: 1, // Ocupa o restante do espaço na seção
   },
   debitItemRow: {
     flexDirection: 'row',
