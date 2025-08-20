@@ -1,6 +1,6 @@
 // screens/HomeScreen.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity } from 'react-native'; // Adicionado TouchableOpacity
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -105,6 +105,8 @@ const generateInitialExpenses = (monthsToDisplay) => {
         value,
         createdAt: createdAtDate.toISOString(), // Salva como ISO string para fácil conversão
         status: 'active', // Despesas iniciais também são ativas por padrão
+        paymentMethod: 'Débito', // Assume débito para despesas geradas automaticamente
+        dueDate: createdAtDate.toISOString(), // Para despesas geradas, dueDate é createdAt
       });
     }
   });
@@ -134,28 +136,63 @@ export default function HomeScreen() {
 
   /**
    * Filtra as despesas relevantes para um determinado mês.
-   * Futuramente, esta função também poderá incorporar a lógica de "exclusão suave" para despesas.
+   * Agora inclui lógica para despesas 'Fixa' e 'Crédito'.
    * @param {Date} monthDate - O objeto Date representando o mês a ser filtrado.
    * @returns {object[]} Um array de despesas para o mês especificado.
    */
   const getExpensesForMonth = (monthDate) => {
     const targetMonth = monthDate.getMonth(); // Mês alvo (0-indexado)
     const targetYear = monthDate.getFullYear(); // Ano alvo
+    const displayMonthStartTimestamp = new Date(targetYear, targetMonth, 1).getTime();
+    
+    let expensesForThisMonth = [];
 
-    // Filtra as despesas que correspondem ao mês e ano alvo
-    return allExpenses.filter(item => {
-      // Usamos item.createdAt para despesas simuladas. No futuro, usaremos item.dueDate.
-      const itemDate = new Date(item.createdAt); 
-      const itemMonth = itemDate.getMonth();
-      const itemYear = itemDate.getFullYear();
+    allExpenses.forEach(item => {
+      // Regra comum de exclusão suave: se inativo e data de exclusão é no ou antes do mês exibido, ignora.
+      if (item.status === 'inactive' && item.deletedAt) {
+        const deletionDate = new Date(item.deletedAt);
+        const deletionMonthStart = new Date(deletionDate.getFullYear(), deletionDate.getMonth(), 1);
+        if (deletionMonthStart.getTime() <= displayMonthStartTimestamp) {
+          return; // Ignora despesas inativas que foram deletadas antes ou no mês atual
+        }
+      }
 
-      // Verifica se a despesa foi criada no mês e ano alvo
-      const isExpenseRelevantToMonth = itemMonth === targetMonth && itemYear === targetYear;
-      
-      // TODO: Futuramente, implementar a lógica de exclusão suave para despesas aqui:
-      // if (item.status === 'inactive' && new Date(item.deletedAt).getTime() <= monthDateTimestamp) { return false; }
+      if (item.paymentMethod === 'Fixa') {
+        // Para despesas Fixas:
+        // Elas devem aparecer em todos os meses a partir da sua data de criação,
+        // até (e incluindo) o mês em que foram marcadas como 'inactive'.
+        const createdAtDate = new Date(item.createdAt);
+        const createdAtMonthStart = new Date(createdAtDate.getFullYear(), createdAtDate.getMonth(), 1).getTime();
 
-      return isExpenseRelevantToMonth;
+        if (createdAtMonthStart <= displayMonthStartTimestamp) {
+          // Usa o dueDayOfMonth salvo para construir a data de vencimento
+          const fixedDueDate = new Date(targetYear, targetMonth, item.dueDayOfMonth || 1); // Garante dia 1 como fallback
+          
+          expensesForThisMonth.push({
+            ...item,
+            dueDate: fixedDueDate.toISOString(), // Salva a data de vencimento como ISO string
+            id: `${item.id}-${targetYear}-${targetMonth}`, // ID único para cada projeção
+            description: `${item.description} (Fixo)` 
+          });
+        }
+      } else if (item.paymentMethod === 'Débito' || item.paymentMethod === 'Crédito') {
+        // Para despesas de Débito e Crédito (parcelas):
+        // Verifica se a dueDate está dentro do mês e ano alvo.
+        if (item.dueDate) {
+          const itemDueDate = new Date(item.dueDate);
+          if (itemDueDate.getMonth() === targetMonth && itemDueDate.getFullYear() === targetYear) {
+            expensesForThisMonth.push(item);
+          }
+        }
+      }
+    });
+
+    // Ordena as despesas encontradas por data de vencimento (ou data de projeção para fixas)
+    return expensesForThisMonth.sort((a, b) => {
+      // Usa a data de vencimento para ordenar. Se não houver, usa a data de criação.
+      const dateA = new Date(a.dueDate || a.createdAt); 
+      const dateB = new Date(b.dueDate || b.createdAt);
+      return dateA.getTime() - dateB.getTime();
     });
   };
 
@@ -172,11 +209,11 @@ export default function HomeScreen() {
       // Carrega as receitas
       const storedIncomesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.INCOMES);
       const storedIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
-      setAllIncomes(storedIncomes); // Atualiza o estado com todas as receitas (ativas e inativas)
+      setAllIncomes(storedIncomes);
       console.log("HomeScreen: Receitas carregadas do AsyncStorage. Total:", storedIncomes.length);
       
       // Carrega ou gera as despesas iniciais
-      const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
+      const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES); // CORRIGIDO: ASYC_STORAGE_KEYS para ASYNC_STORAGE_KEYS
       let currentExpenses;
       if (!storedExpensesJson) {
         // Se não houver despesas salvas, gera algumas iniciais para demonstração
@@ -188,7 +225,7 @@ export default function HomeScreen() {
         currentExpenses = JSON.parse(storedExpensesJson);
         console.log("HomeScreen: Despesas carregadas do AsyncStorage. Total:", currentExpenses.length);
       }
-      setAllExpenses(currentExpenses); // Atualiza o estado com todas as despesas
+      setAllExpenses(currentExpenses);
       
     } catch (error) {
       console.error("HomeScreen: Erro ao carregar dados do AsyncStorage:", error);
@@ -339,10 +376,12 @@ export default function HomeScreen() {
           {expenses.length > 0 ? (
             <ScrollView style={styles.expensesScrollView}>
               {expenses.map((item) => (
+                // Use o ID da despesa + data do mês para a chave, para evitar conflitos com despesas fixas
+                // que aparecem em vários meses. Se a despesa é fixa, use o ID gerado na getExpensesForMonth
                 <View key={String(item.id)} style={styles.debitItemRow}>
                   <Text style={[styles.debitText, styles.descriptionColumn]}>{String(item.description)}</Text>
-                  {/* Para despesas simuladas, usamos createdAt. Com despesas reais, usaríamos dueDate */}
-                  <Text style={[styles.debitText, styles.dateColumn]}>{String(formatDateForDisplay(new Date(item.createdAt)))}</Text> 
+                  {/* Usa item.dueDate, que agora será um ISO string válido para despesas fixas também */}
+                  <Text style={[styles.debitText, styles.dateColumn]}>{String(formatDateForDisplay(new Date(item.dueDate)))}</Text> 
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
                   </Text>
