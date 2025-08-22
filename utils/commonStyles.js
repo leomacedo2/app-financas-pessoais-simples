@@ -4,6 +4,13 @@
  * @file Arquivo para definir estilos CSS comuns e reutilizáveis em todo o aplicativo.
  * Centralizar estilos evita duplicação de código, garante consistência visual
  * e facilita a manutenção (mude em um lugar, reflita em todos).
+ *
+ * Atualizações:
+ * - Adicionado `modalText` para textos dentro do modal.
+ * - Ajustados estilos de `modalButton`, `buttonEdit`, `buttonClose` para exibição correta
+ * dos botões Confirmar e Cancelar nos modais, garantindo que apareçam lado a lado.
+ * - Adicionados estilos específicos para os botões de opção do modal de limpeza principal.
+ * - Adicionados estilos para os containers do picker de Mês/Ano.
  */
 
 import { StyleSheet } from 'react-native';
@@ -39,24 +46,26 @@ const commonStyles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: '#fff', // Fundo branco para o input
     fontSize: 16,
+    color: '#333',
   },
-  // Estilo para o botão principal de adição/salvar em várias telas.
+  // Estilo para o botão principal de adição/salvar.
   addButton: {
     backgroundColor: '#007bff', // Azul primário
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 10,
+    marginBottom: 20, // Garante espaço na parte inferior
     shadowColor: '#000', // Sombra para dar profundidade
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
   },
-  // Estilo para o texto dentro dos botões principais.
+  // Estilo para o texto dentro do botão principal.
   buttonText: {
-    color: '#fff', // Texto branco
+    color: '#ffffff', // Texto branco
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -97,21 +106,30 @@ const commonStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  modalButton: {
-    borderRadius: 10,
-    padding: 15,
+  modalText: { // NOVO ESTILO: Para textos informativos dentro do modal
+    marginBottom: 15,
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#555',
+  },
+  modalButton: { // Estilo base para botões dentro do modal
+    borderRadius: 8, // Borda mais suave para os botões do modal
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     elevation: 2,
-    width: '100%',
-    marginBottom: 10,
+    flex: 1, // <--- ADICIONADO: Para que ocupem espaço igual em uma linha
+    marginHorizontal: 5, // <--- ADICIONADO: Espaçamento entre os botões
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  buttonEdit: {
-    backgroundColor: '#2196F3', // Azul para editar
+  buttonEdit: { // Botão de "Editar" ou "Confirmar" (azul)
+    backgroundColor: '#007bff', // Azul primário
   },
-  buttonDelete: {
-    backgroundColor: '#f44336', // Vermelho para excluir
+  buttonDelete: { // Botão de "Excluir" (vermelho)
+    backgroundColor: '#dc3545', // Vermelho para exclusão
   },
-  buttonClose: {
-    backgroundColor: '#9e9e9e', // Cinza para cancelar
+  buttonClose: { // Botão de "Cancelar" ou "Fechar" (cinza)
+    backgroundColor: '#6c757d', // Cinza suave
   },
   buttonTextStyle: {
     color: 'white',
@@ -119,7 +137,7 @@ const commonStyles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
   },
-  // Estilos para o componente Picker (utilizado em AdicionarCartaoScreen).
+  // Estilos para o componente Picker (utilizado em AdicionarCartaoScreen e agora no modal de Mês/Ano).
   pickerContainer: {
     borderColor: '#ccc',
     borderWidth: 1,
@@ -171,7 +189,7 @@ const commonStyles = StyleSheet.create({
     fontWeight: 'bold',
   },
   typeButtonTextSelected: {
-    color: '#fff',
+    color: '#ffffff',
   },
   typeButtonTextUnselected: {
     color: '#333',
@@ -192,6 +210,30 @@ const commonStyles = StyleSheet.create({
   dateDisplayText: {
     fontSize: 16,
     color: '#333',
+  },
+  // NOVOS ESTILOS PARA OS BOTÕES DE OPÇÃO DO MODAL DE LIMPEZA DO HOMESCREEN
+  optionButton: { 
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
+  },
+  optionButtonSelected: {
+    backgroundColor: '#007bff',
+    borderColor: '#007bff',
+  },
+  optionButtonText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  optionButtonTextSelected: {
+    color: '#fff',
   },
 });
 

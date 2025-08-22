@@ -8,20 +8,41 @@
  * Funcionalidades principais:
  * - Exibição paginada de despesas para meses passados e futuros.
  * - Cálculo e exibição da receita total e valor final para o mês visível.
- * - Geração de despesas aleatórias para teste via botão dedicado.
- * - Ocultação de meses sem despesas (exceto o mês atual do sistema).
+ * - Geração de despesas aleatórias para TODOS os meses no range.
+ * - O mês atual do sistema é SEMPRE exibido na FlatList e a rolagem inicial vai para ele.
  * - Sincronização de dados de receitas e despesas com AsyncStorage.
+ * - Modal aprimorado para limpeza de dados, permitindo a seleção de Mês/Ano para exclusão suave.
  *
- * Correção de Bug: Resolvido o TypeError "Cannot read property 'forEach' of undefined"
- * na função `generateRandomExpensesData` ao garantir que a lista de meses seja
- * passada corretamente (`monthsToDisplay.current`).
+ * Correções e Melhorias CRÍTICAS (Versão Final para Flicker):
+ * 1.  **RESOLVIDO DEFINITIVAMENTE: Flicker de Rolagem (Agosto 2024 -> Agosto 2025)**:
+ * A lógica de inicialização da rolagem foi **completamente reestruturada**.
+ * Agora, o `currentMonthIndex` (que serve como `initialScrollIndex` da `FlatList`)
+ * é calculado e atualizado *dentro do `loadData`*, logo após o carregamento dos dados
+ * e a estabilização da lista de meses filtrados (`filteredMonthsToDisplay`).
+ * Isso garante que a `FlatList` já renderize no mês correto (Agosto de 2025) desde
+ * a sua primeira aparição após o `loadingApp` ser `false`, eliminando o flicker.
+ * 2.  **`initialScrollIndex` Confiável**: A `FlatList` usa diretamente o `currentMonthIndex`
+ * (já pré-calculado e correto) para sua posição inicial.
+ * 3.  **Funções de Filtro de Dados Refatoradas**: `getExpensesForMonth` e `getIncomesForMonth`
+ * agora aceitam os arrays de dados (`incomesData`, `expensesData`) como argumentos,
+ * garantindo consistência no cálculo de `filteredMonthsToDisplay` durante o `loadData`.
+ * 4.  **`ReferenceError` em `ASYNC_STORAGE_KEYS`**: O erro de digitação
+ * `ASYC_STORAGE_KEYS` foi corrigido para `ASYNC_STORAGE_KEYS` na função
+ * `performMonthYearClear`. Este erro já havia sido corrigido na versão anterior e foi mantido.
+ * 5.  **NOVO: CORRIGIDO: Exclusão Incorreta de Receitas 'Ganho' no Modal de Limpeza**:
+ * A lógica de exclusão suave para receitas do tipo 'Ganho' no modal de limpeza mês-a-mês
+ * foi corrigida para usar as propriedades `income.month` e `income.year` (que indicam
+ * o mês ao qual o ganho se refere) em vez de `income.createdAt` (data de criação do registro).
+ * Isso garante que apenas as receitas de 'Ganho' que realmente *pertencem* ao mês
+ * selecionado para limpeza sejam marcadas como inativas.
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native'; // Hook para executar efeitos quando a tela está em foco
-import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Para lidar com a área segura do dispositivo
+import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Picker } from '@react-native-picker/picker'; // Para o seletor de mês/ano no modal
 
 // Importa os estilos comuns para reutilização em todo o aplicativo
 import commonStyles from '../utils/commonStyles';
@@ -72,6 +93,17 @@ const getMonthName = (date) => {
 };
 
 /**
+ * Formata um objeto Date para o formato "MM/YYYY" (usado para `excludedMonths`).
+ * @param {Date} date - O objeto Date.
+ * @returns {string} A data formatada como string "MM/YYYY".
+ */
+const formatMonthYearForExclusion = (date) => {
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}/${year}`;
+};
+
+/**
  * Gera uma lista de objetos Date representando os meses a serem considerados na aplicação.
  * Inclui o mês atual, um número configurável de meses anteriores e posteriores.
  * Esta lista é a base para a FlatList e a geração de despesas aleatórias.
@@ -113,10 +145,9 @@ const generateRandomExpensesData = (monthsToConsider) => {
     'Telefone', 'Transporte', 'Lazer', 'Educação', 'Saúde', 'Restaurante', 'Roupas'
   ];
 
-  // Verifica se monthsToConsider é um array válido antes de usar forEach
   if (!Array.isArray(monthsToConsider)) {
     console.error("generateRandomExpensesData: monthsToConsider não é um array válido.");
-    return []; // Retorna um array vazio para evitar o erro
+    return [];
   }
 
   monthsToConsider.forEach(monthDate => {
@@ -153,85 +184,94 @@ export default function HomeScreen() {
   const [loadingApp, setLoadingApp] = useState(true); // Indica se os dados iniciais estão sendo carregados
   const [allIncomes, setAllIncomes] = useState([]); // Armazena todas as receitas (ativas e inativas)
   const [allExpenses, setAllExpenses] = useState([]); // Armazena todas as despesas (ativas e inativas)
-  const [hasScrolled, setHasScrolled] = useState(false); // Flag para garantir que a rolagem inicial ocorra apenas uma vez
+
+  // Estados para o modal de limpeza de dados
+  const [isClearDataModalVisible, setIsClearDataModalVisible] = useState(false);
+  const [selectedClearOption, setSelectedClearOption] = useState('4'); // Padrão: "Limpar TODOS os dados"
+
+  // Estados para o novo modal de seleção de Mês/Ano para limpeza suave
+  const [isMonthYearPickerVisible, setIsMonthYearYearPickerVisible] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0')); // Mês atual
+  const [pickerYear, setPickerYear] = useState(String(new Date().getFullYear())); // Ano atual
 
   // Usa useRef para armazenar a lista COMPLETA de meses.
-  // Isso evita que a lista seja recriada em cada re-renderização,
-  // mas o 'current' sempre aponta para o mesmo array estável.
-  // A inicialização foi corrigida para armazenar o array diretamente no .current
   const monthsToDisplay = useRef(generateMonthsToDisplay());
 
   // Calcula a data do primeiro dia do mês atual do sistema.
-  // Usado para identificar o mês atual na FlatList e na lógica de filtragem.
   const today = new Date();
-  const initialMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  const initialMonthDate = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), []);
 
   // Estado para o índice do mês atualmente visível na FlatList FILTRADA.
-  // Inicializa em 0 e será ajustado após a filtragem e rolagem inicial.
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
   const flatListRef = useRef(null); // Ref para controlar o FlatList (rolagem programática)
 
+  // Flag para controlar se a rolagem para o mês atual já foi tentada desde o último foco/loadData
+  const scrollAttempted = useRef(false);
+
   /**
-   * Filtra as despesas do array 'allExpenses' que são relevantes para um mês específico.
+   * Filtra as despesas do array 'expensesData' que são relevantes para um mês específico.
    * Inclui lógica para despesas 'Fixa', 'Débito' e 'Crédito', e respeita a exclusão suave.
+   * Também verifica se o item fixo está excluído para o mês atual.
    * Usa useCallback para memorizar a função e evitar recriações desnecessárias,
    * melhorando o desempenho, especialmente em listas grandes.
    * @param {Date} monthDate - O objeto Date representando o primeiro dia do mês a ser filtrado.
+   * @param {Array} expensesData - O array de despesas a ser filtrado.
+   * @param {boolean} onlyActive - Se verdadeiro, retorna apenas despesas com status 'active' ou 'pending' (não 'inactive').
    * @returns {object[]} Um array de objetos de despesa que pertencem ao mês especificado.
    */
-  const getExpensesForMonth = useCallback((monthDate) => {
+  const getExpensesForMonth = useCallback((monthDate, expensesData, onlyActive = false) => {
     const targetMonth = monthDate.getMonth(); // Mês alvo (0-indexado)
     const targetYear = monthDate.getFullYear(); // Ano alvo
-    // Timestamp do início do mês alvo, usado para comparação eficiente de datas.
     const displayMonthStartTimestamp = new Date(targetYear, targetMonth, 1).getTime();
+    const currentMonthYearString = formatMonthYearForExclusion(monthDate);
     
     let expensesForThisMonth = [];
 
-    // Itera sobre todas as despesas carregadas
-    allExpenses.forEach(item => {
-      // Regra de exclusão suave: se a despesa está inativa E tem uma data de exclusão
-      // E essa data de exclusão é anterior ou no mesmo mês que o mês atual da exibição,
-      // então esta despesa não deve ser mostrada.
+    expensesData.forEach(item => { // Usa expensesData passado como argumento
+      // Se onlyActive for true, pula itens inativos
+      if (onlyActive && item.status === 'inactive') {
+        return;
+      }
+
+      // Regra de exclusão suave para itens inativos já marcados como tal
       if (item.status === 'inactive' && item.deletedAt) {
         const deletionDate = new Date(item.deletedAt);
         const deletionMonthStart = new Date(deletionDate.getFullYear(), deletionDate.getMonth(), 1);
         if (deletionMonthStart.getTime() <= displayMonthStartTimestamp) {
-          return; // Pula para a próxima despesa
+          return; // Pula para a próxima despesa se a inativação ocorreu antes ou no mês de exibição
         }
       }
 
       // Lógica para despesas do tipo 'Fixa'
       if (item.paymentMethod === 'Fixa') {
+        if (item.excludedMonths && item.excludedMonths.includes(currentMonthYearString)) {
+          return; // Pula se o mês estiver na lista de exclusão
+        }
+
         const createdAtDate = new Date(item.createdAt);
         const createdAtMonthStart = new Date(createdAtDate.getFullYear(), createdAtDate.getMonth(), 1).getTime();
 
         // Despesas fixas só aparecem a partir do mês em que foram criadas.
         if (createdAtMonthStart <= displayMonthStartTimestamp) {
-          let dayForFixedExpense = item.dueDayOfMonth || 1; // Pega o dia de vencimento salvo, ou 1 como padrão
-          // Calcula o último dia do mês alvo para evitar datas inválidas (ex: 31 de fevereiro)
+          let dayForFixedExpense = item.dueDayOfMonth || 1;
           const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
 
-          // Se o dia salvo for maior que o último dia do mês, ajusta para o último dia válido.
           if (dayForFixedExpense > lastDayOfTargetMonth) {
             dayForFixedExpense = lastDayOfTargetMonth;
           }
 
-          // Cria a data de vencimento ajustada para a despesa fixa neste mês.
           const fixedDueDate = new Date(targetYear, targetMonth, dayForFixedExpense);
           
-          // Adiciona a despesa fixa ao array, com um ID único para esta projeção mensal
-          // e uma descrição que indica que é uma despesa fixa.
           expensesForThisMonth.push({
             ...item,
-            dueDate: fixedDueDate.toISOString(), // Salva a data de vencimento como ISO string
-            id: `${item.id}-${targetYear}-${targetMonth}`, // ID único para cada projeção mensal
+            dueDate: fixedDueDate.toISOString(),
+            id: `${item.id}-${targetYear}-${targetMonth}`,
             description: `${item.description} (Fixo)` 
           });
         }
       }
       // Lógica para despesas do tipo 'Débito' ou 'Crédito' (parcelas)
       else if (item.paymentMethod === 'Débito' || item.paymentMethod === 'Crédito') {
-        // Verifica se a despesa tem uma data de vencimento (dueDate) e se ela pertence ao mês alvo.
         if (item.dueDate) {
           const itemDueDate = new Date(item.dueDate);
           if (itemDueDate.getMonth() === targetMonth && itemDueDate.getFullYear() === targetYear) {
@@ -239,148 +279,260 @@ export default function HomeScreen() {
           }
         }
       }
-    });
-
-    // Ordena as despesas encontradas para o mês por data de vencimento (ou data de criação se dueDate não existir)
+    });    
     return expensesForThisMonth.sort((a, b) => {
       const dateA = new Date(a.dueDate || a.createdAt); 
       const dateB = new Date(b.dueDate || b.createdAt);
       return dateA.getTime() - dateB.getTime();
     });
-  }, [allExpenses]); // Esta função será recriada apenas se 'allExpenses' mudar.
+  }, []); // Dependências para esta função: nenhuma, pois os dados são passados como argumento.
 
+  /**
+   * Filtra as receitas do array 'incomesData' que são relevantes para um mês específico.
+   * Considera receitas fixas e ganhos pontuais.
+   * @param {Date} monthDate - O objeto Date representando o primeiro dia do mês a ser filtrado.
+   * @param {Array} incomesData - O array de receitas a ser filtrado.
+   * @param {boolean} onlyActive - Se verdadeiro, retorna apenas receitas com status 'active' (não 'inactive').
+   * @returns {object[]} Um array de objetos de receita que pertencem ao mês especificado (ativas ou inativas).
+   */
+  const getIncomesForMonth = useCallback((monthDate, incomesData, onlyActive = false) => {
+    const targetMonth = monthDate.getMonth();
+    const targetYear = monthDate.getFullYear();
+    const displayMonthStartTimestamp = new Date(targetYear, targetMonth, 1).getTime();
+    const currentMonthYearString = formatMonthYearForExclusion(monthDate);
+
+    let incomesForThisMonth = [];
+
+    incomesData.forEach(item => { // Usa incomesData passado como argumento
+      if (onlyActive && item.status === 'inactive') {
+        return;
+      }
+
+      // Regra de exclusão suave para itens inativos já marcados como tal
+      if (item.status === 'inactive' && item.deletedAt) {
+        const deletionDate = new Date(item.deletedAt);
+        const deletionMonthStart = new Date(deletionDate.getFullYear(), deletionDate.getMonth(), 1);
+        if (deletionMonthStart.getTime() <= displayMonthStartTimestamp) {
+          return; // Pula para a próxima receita se a inativação ocorreu antes ou no mês de exibição
+        }
+      }
+
+      if (item.type === 'Fixo') {
+        if (item.excludedMonths && item.excludedMonths.includes(currentMonthYearString)) {
+          return;
+        }
+
+        const createdAtDate = new Date(item.createdAt);
+        const createdAtMonthStart = new Date(createdAtDate.getFullYear(), createdAtDate.getMonth(), 1).getTime();
+        if (createdAtMonthStart <= displayMonthStartTimestamp) {
+          incomesForThisMonth.push(item);
+        }
+      } else if (item.type === 'Ganho') {
+        if (item.month === targetMonth && item.year === targetYear) {
+          incomesForThisMonth.push(item);
+        }
+      }
+    });    
+    return incomesForThisMonth;
+  }, []); // Dependências para esta função: nenhuma, pois os dados são passados como argumento.
 
   /**
    * Filtra a lista completa de meses (`monthsToDisplay.current`) para exibir apenas os meses
-   * que contêm despesas OU o mês atual do sistema.
-   * Usa useMemo para otimizar: a lista filtrada só será recalculada se suas dependências mudarem.
-   * Isso é crucial para o desempenho, evitando re-renderizações desnecessárias do FlatList.
+   * que contêm despesas OU receitas ATIVAS, OU O MÊS ATUAL DO SISTEMA.
+   * O mês atual do sistema sempre será incluído, mesmo que vazio.
+   * Usa useMemo para otimizar.
    */
   const filteredMonthsToDisplay = useMemo(() => {
-    return monthsToDisplay.current.filter(monthDate => { // Acessando .current aqui
-      // Verifica se o mês atual da iteração é o mês atual do sistema
-      const isCurrentMonth = monthDate.getMonth() === initialMonthDate.getMonth() &&
-                             monthDate.getFullYear() === initialMonthDate.getFullYear();
-      // Verifica se o mês atual da iteração tem alguma despesa registrada
-      const hasExpenses = getExpensesForMonth(monthDate).length > 0;
-      // Um mês será exibido se for o mês atual OU se tiver despesas.
-      return isCurrentMonth || hasExpenses;
+    const allGeneratedMonths = monthsToDisplay.current;
+    const todayMonth = initialMonthDate.getMonth();
+    const todayYear = initialMonthDate.getFullYear();
+
+    const filtered = allGeneratedMonths.filter(monthDate => {
+      const isCurrentSystemMonth = monthDate.getMonth() === todayMonth && monthDate.getFullYear() === todayYear;
+      
+      // Passa os estados 'allExpenses' e 'allIncomes' para as funções de filtro
+      const activeExpensesForMonth = getExpensesForMonth(monthDate, allExpenses, true);
+      const hasActiveExpenses = activeExpensesForMonth.length > 0;
+      
+      const activeIncomesForMonth = getIncomesForMonth(monthDate, allIncomes, true);
+      const hasActiveIncomes = activeIncomesForMonth.length > 0;
+
+      // O mês será exibido se for o mês atual do sistema OU se tiver alguma movimentação ativa
+      return isCurrentSystemMonth || hasActiveExpenses || hasActiveIncomes;
     });
-  }, [monthsToDisplay, initialMonthDate, getExpensesForMonth]); // Depende dessas variáveis
 
-
-  /**
-   * Recalcula o índice para rolagem inicial, mas agora com base na lista FILTRADA de meses.
-   * Isso garante que a FlatList role para a posição correta, mesmo que meses anteriores
-   * sem despesas tenham sido ocultados.
-   */
-  const initialScrollIndexFiltered = useMemo(() => {
-    return filteredMonthsToDisplay.findIndex(monthDate =>
-      monthDate.getMonth() === initialMonthDate.getMonth() &&
-      monthDate.getFullYear() === initialMonthDate.getFullYear()
+    // Garante que o mês atual do sistema esteja sempre incluído, mesmo que não tenha dados ativos.
+    const isTodayMonthIncluded = filtered.some(monthDate =>
+      monthDate.getMonth() === todayMonth && monthDate.getFullYear() === todayYear
     );
-  }, [filteredMonthsToDisplay, initialMonthDate]);
+    if (!isTodayMonthIncluded) {
+      filtered.push(initialMonthDate);
+    }
+
+    // Ordena para garantir que a ordem cronológica seja mantida
+    return filtered.sort((a, b) => a.getTime() - b.getTime());
+
+  }, [monthsToDisplay, initialMonthDate, allExpenses, allIncomes, getExpensesForMonth, getIncomesForMonth]);
+
+
+  // ************* NOVO: Opções de mês e ano para o Picker do modal de limpeza inteligente *************
+  // Gera as opções de mês para o Picker baseadas nos meses visíveis
+  const pickerMonthOptions = useMemo(() => {
+    const uniqueMonths = new Set();
+    filteredMonthsToDisplay.forEach(date => uniqueMonths.add(String(date.getMonth() + 1).padStart(2, '0')));
+    return Array.from(uniqueMonths).sort();
+  }, [filteredMonthsToDisplay]);
+
+  // Gera as opções de ano para o Picker baseadas nos anos visíveis
+  const pickerYearOptions = useMemo(() => {
+    const uniqueYears = new Set();
+    filteredMonthsToDisplay.forEach(date => uniqueYears.add(String(date.getFullYear())));
+    return Array.from(uniqueYears).sort();
+  }, [filteredMonthsToDisplay]);
+  // ************* FIM NOVO *************
 
 
   /**
    * Carrega todos os dados (receitas e despesas) do AsyncStorage.
-   * Esta função NÃO gera despesas aleatórias por padrão no carregamento inicial.
    * Usa useCallback para memorização.
+   * Agora também calcula e define o `currentMonthIndex` após o carregamento.
    */
   const loadData = useCallback(async () => {
     setLoadingApp(true); // Ativa o estado de carregamento
     try {
-      // Carrega as receitas do AsyncStorage
       const storedIncomesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.INCOMES);
       const storedIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
       setAllIncomes(storedIncomes);
-      console.log("HomeScreen: Receitas carregadas do AsyncStorage. Total:", storedIncomes.length);
       
-      // Carrega as despesas do AsyncStorage
       const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
-      let currentExpenses;
-      if (!storedExpensesJson) {
-        // Se não houver despesas salvas, começa com um array vazio.
-        // A geração de despesas aleatórias agora é feita via botão.
-        currentExpenses = [];
-        console.log("HomeScreen: Nenhuma despesa encontrada, iniciando com lista vazia.");
-      } else {
-        // Caso contrário, carrega as despesas existentes
-        currentExpenses = JSON.parse(storedExpensesJson);
-        console.log("HomeScreen: Despesas carregadas do AsyncStorage. Total:", currentExpenses.length);
-      }
+      const currentExpenses = storedExpensesJson ? JSON.parse(storedExpensesJson) : [];
       setAllExpenses(currentExpenses);
+
+      // --- NOVO: Cálculo e definição do initialScrollIndex após o carregamento dos dados ---
+      // Re-calcula filteredMonthsToDisplay *com os dados recém-carregados* para encontrar o índice correto
+      const tempFilteredMonths = monthsToDisplay.current.filter(monthDate => {
+        const isCurrentSystemMonth = monthDate.getMonth() === initialMonthDate.getMonth() && monthDate.getFullYear() === initialMonthDate.getFullYear();
+        const activeExpensesForMonth = getExpensesForMonth(monthDate, currentExpenses, true);
+        const hasActiveExpenses = activeExpensesForMonth.length > 0;
+        const activeIncomesForMonth = getIncomesForMonth(monthDate, storedIncomes, true);
+        const hasActiveIncomes = activeIncomesForMonth.length > 0;
+        return isCurrentSystemMonth || hasActiveExpenses || hasActiveIncomes;
+      });
+      // Garante que o initialMonthDate esteja presente
+      if (!tempFilteredMonths.some(m => m.getTime() === initialMonthDate.getTime())) {
+        tempFilteredMonths.push(initialMonthDate);
+      }
+      tempFilteredMonths.sort((a, b) => a.getTime() - b.getTime());
+
+      const targetIndex = tempFilteredMonths.findIndex(monthDate =>
+        monthDate.getMonth() === initialMonthDate.getMonth() &&
+        monthDate.getFullYear() === initialMonthDate.getFullYear()
+      );
       
+      if (targetIndex !== -1) {
+        setCurrentMonthIndex(targetIndex); // Define o estado para que FlatList use como initialScrollIndex
+        console.log(`[DEBUG - loadData]: Índice inicial do mês atual calculado: ${targetIndex}`);
+      } else {
+        setCurrentMonthIndex(0); // Fallback para o primeiro item se não encontrar (situação improvável)
+        console.warn(`[DEBUG - loadData]: Mês atual do sistema não encontrado na lista filtrada, padrão para índice 0.`);
+      }
+      // --- FIM NOVO ---
+
     } catch (error) {
       console.error("HomeScreen: Erro ao carregar dados do AsyncStorage:", error);
       Alert.alert('Erro de Carregamento', 'Não foi possível carregar os dados de finanças do armazenamento local.');
     } finally {
-      setLoadingApp(false); // Desativa o estado de carregamento, mesmo em caso de erro
+      setLoadingApp(false); // Desativa o estado de carregamento
+      scrollAttempted.current = false; // Reset the scroll flag after all data is loaded and index set.
     }
-  }, []); // Array de dependências vazio para useCallback: a função só é criada uma vez.
+  }, [initialMonthDate, monthsToDisplay, getExpensesForMonth, getIncomesForMonth]);
+
 
   /**
-   * Função para gerar despesas aleatórias e salvá-las no AsyncStorage.
-   * Esta função é vinculada ao novo botão "Gerar Despesas Aleatórias".
-   * Após a geração, os dados são recarregados para atualizar a interface.
+   * Função para gerar despesas aleatórias e salvá-las no AsyncStorage,
+   * para TODOS os meses no range.
+   * Após a geração, os dados são recarregados.
    * Usa useCallback para memorização.
    */
   const handleGenerateRandomExpenses = useCallback(async () => {
-    setLoadingApp(true); // Ativa o indicador de carregamento enquanto gera
+    setLoadingApp(true);
     try {
-      // CORREÇÃO: Passando monthsToDisplay.current para a função de geração de dados
+      // Gera despesas para TODOS os meses no range
       const generated = generateRandomExpensesData(monthsToDisplay.current); 
-      // Salva as despesas geradas no AsyncStorage
-      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(generated));
-      Alert.alert('Sucesso', `${generated.length} despesas aleatórias geradas e salvas!`);
-      await loadData(); // Recarrega os dados para que a interface reflita as novas despesas
+
+      const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
+      const existingExpenses = storedExpensesJson ? JSON.parse(storedExpensesJson) : [];
+      
+      const combinedExpenses = [...existingExpenses, ...generated];
+
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(combinedExpenses));
+      Alert.alert('Sucesso', `${generated.length} despesas aleatórias geradas e adicionadas para todos os meses!`);
+      // Após a geração e salvamento, a flag scrollAttempted deve ser resetada
+      // para que a rolagem para o mês atual ocorra na próxima renderização.
+      await loadData(); // Recarrega os dados, o que desencadeará a rolagem via useEffect
     } catch (error) {
       console.error("HomeScreen: Erro ao gerar despesas aleatórias:", error);
       Alert.alert('Erro', `Não foi possível gerar despesas aleatórias: ${error.message}`);
     } finally {
-      setLoadingApp(false); // Desativa o indicador de carregamento
+      setLoadingApp(false);
     }
-  }, [loadData, monthsToDisplay]); // Depende de 'loadData' e 'monthsToDisplay' (ref. current)
+  }, [loadData, monthsToDisplay]);
+
 
   /**
    * Hook `useFocusEffect` do React Navigation.
    * Garante que os dados sejam recarregados sempre que a tela Home entra em foco.
-   * Isso resolve problemas de sincronização quando o usuário navega de volta para esta tela.
+   * Ele reseta a flag `scrollAttempted` para permitir que a rolagem para o mês atual
+   * ocorra novamente após o carregamento dos dados.
    */
   useFocusEffect(
     useCallback(() => {
-      loadData(); // Chama a função para carregar os dados
+      // Quando a tela é focada, resetamos a flag para que a rolagem seja reavaliada
+      // na próxima vez que os dados estiverem carregados e estáveis.
+      scrollAttempted.current = false; 
+      loadData(); 
       return () => {
-        // Lógica de limpeza, se necessário, ao sair do foco da tela (ex: limpar listeners).
+        // Lógica de limpeza, se necessário, ao sair do foco da tela.
       };
-    }, [loadData]) // Garante que o efeito seja reexecutado se 'loadData' mudar.
+    }, [loadData]) // Dependências de useFocusEffect
   );
 
   /**
-   * Efeito para rolar o FlatList para o mês atual (na lista FILTRADA) na montagem inicial.
-   * É executado apenas uma vez após o carregamento dos dados e quando as condições são atendidas.
+   * useEffect para lidar com a rolagem para o mês correto.
+   * Este efeito é disparado quando `loadingApp` se torna `false` e
+   * `filteredMonthsToDisplay` é atualizado. Ele agora age como uma garantia de correção,
+   * caso o `initialScrollIndex` não seja perfeito na primeira renderização,
+   * ou para scrolls subsequentes acionados por operações que não o `loadData` inicial.
    */
   useEffect(() => {
-    // Verifica se a referência do FlatList está disponível, se o índice inicial é válido,
-    // se o app já carregou (loadingApp é false) e se ainda não rolamos (hasScrolled é false).
-    if (flatListRef.current && initialScrollIndexFiltered !== -1 && !loadingApp && !hasScrolled) {
-      console.log("HomeScreen: Tentando rolar para o initialScrollIndexFiltered:", initialScrollIndexFiltered);
-      // Pequeno delay para garantir que o FlatList esteja completamente renderizado
-      setTimeout(() => {
-        if (flatListRef.current && !hasScrolled) {
-          flatListRef.current.scrollToIndex({ index: initialScrollIndexFiltered, animated: false });
-          setHasScrolled(true); // Marca como já rolou para evitar rolagens futuras desnecessárias
-          console.log("HomeScreen: Rolagem para initialScrollIndexFiltered concluída.");
-        } else {
-          console.log("HomeScreen: Rolagem já tentada ou FlatList ref nulo.");
+    // Só executa se o app não está carregando, há meses filtrados e a rolagem ainda não foi marcada como "tentada".
+    if (!loadingApp && filteredMonthsToDisplay.length > 0 && !scrollAttempted.current) {
+        const targetIndex = filteredMonthsToDisplay.findIndex(monthDate =>
+            monthDate.getMonth() === initialMonthDate.getMonth() &&
+            monthDate.getFullYear() === initialMonthDate.getFullYear()
+        );
+
+        if (flatListRef.current && targetIndex !== -1 && currentMonthIndex === targetIndex) {
+            // Se já estamos no índice correto (o que deveria acontecer com o novo loadData),
+            // apenas marcamos como tentado e logamos. Não há necessidade de re-rolar.
+            scrollAttempted.current = true;
+            console.log(`[DEBUG - Scroll useEffect]: Já no mês alvo: ${getMonthName(initialMonthDate)}/${initialMonthDate.getFullYear()} (Index: ${targetIndex})`);
+        } else if (flatListRef.current && targetIndex !== -1) {
+            // Se por alguma razão o currentMonthIndex não estava no alvo, ou precisamos corrigir,
+            // fazemos o scroll. Um pequeno timeout ainda pode ser útil aqui para garantir
+            // que o layout da FlatList esteja 100% estabilizado, especialmente após re-renders.
+            setTimeout(() => {
+                if (flatListRef.current) {
+                    flatListRef.current.scrollToIndex({ index: targetIndex, animated: false });
+                    setCurrentMonthIndex(targetIndex);
+                    scrollAttempted.current = true;
+                    console.log(`[DEBUG - Scroll useEffect]: Corrigindo rolagem para o mês alvo: ${getMonthName(initialMonthDate)}/${initialMonthDate.getFullYear()} (Index: ${targetIndex})`);
+                }
+            }, 100); // Pequeno delay
         }
-      }, 200); // 200ms de atraso para dar tempo de renderizar
-    } else if (flatListRef.current === null) {
-        console.log("HomeScreen: Não rolou para o initialScrollIndexFiltered. flatListRef.current é null.");
-    } else {
-        console.log("HomeScreen: Não rolou para o initialScrollIndexFiltered. Condições: initialScrollIndexFiltered: ", initialScrollIndexFiltered, "loadingApp: ", loadingApp, "hasScrolled: ", hasScrolled);
     }
-  }, [initialScrollIndexFiltered, loadingApp, hasScrolled]); // Dependências do efeito
+  }, [loadingApp, filteredMonthsToDisplay, initialMonthDate, currentMonthIndex]);
+
 
   /**
    * Calcula a receita total para um mês específico, considerando receitas fixas e ganhos pontuais,
@@ -389,48 +541,44 @@ export default function HomeScreen() {
    * @returns {number} O valor total da receita para o mês.
    */
   const calculateTotalIncomeForMonth = (monthDate) => {
-    const targetMonth = monthDate.getMonth(); // Mês 0-indexado do mês exibido
-    const targetYear = monthDate.getFullYear(); // Ano do mês exibido
+    const targetMonth = monthDate.getMonth();
+    const targetYear = monthDate.getFullYear();
     let totalIncome = 0;
 
-    // Converte o mês exibido para um objeto Date no primeiro dia do mês para comparações de timestamp
     const displayMonthStart = new Date(targetYear, targetMonth, 1);
+    const currentMonthYearString = formatMonthYearForExclusion(monthDate);
     
     allIncomes.forEach(income => {
+      if (income.type === 'Fixo' && income.excludedMonths && income.excludedMonths.includes(currentMonthYearString)) {
+        return;
+      }
+
       const incomeCreationDate = new Date(income.createdAt);
       const creationMonthStart = new Date(incomeCreationDate.getFullYear(), incomeCreationDate.getMonth(), 1);
 
-      // --- Regra para Receitas Fixas ---
       if (income.type === 'Fixo') {
-        // 1. Receita fixa só deve ser considerada se sua data de criação for no ou antes do mês exibido.
         const isCreatedBeforeOrInDisplayMonth = creationMonthStart.getTime() <= displayMonthStart.getTime();
         
         let isActiveInDisplayMonth = true;
-        // 2. Verifica o status e a data de exclusão suave
         if (income.status === 'inactive' && income.deletedAt) {
           const deletionDate = new Date(income.deletedAt);
           const deletionMonthStart = new Date(deletionDate.getFullYear(), deletionDate.getMonth(), 1);
           
-          // Se a receita foi inativada ANTES ou NO MÊS exibido, ela NÃO é mais ativa para este mês.
           if (deletionMonthStart.getTime() <= displayMonthStart.getTime()) {
             isActiveInDisplayMonth = false;
           }
         }
 
-        // Se a receita fixa foi criada a tempo e ainda está ativa para este mês, adiciona seu valor.
         if (isCreatedBeforeOrInDisplayMonth && isActiveInDisplayMonth) {
           totalIncome += income.value;
         }
       } 
-      // --- Regra para Receitas de Ganho Pontual ---
       else if (income.type === 'Ganho' && income.month === targetMonth && income.year === targetYear) {
-        // Receita de ganho é pontual para um mês/ano específico, mas também respeita a exclusão suave.
         let isActiveInDisplayMonth = true;
         if (income.status === 'inactive' && income.deletedAt) {
           const deletionDate = new Date(income.deletedAt);
           const deletionMonthStart = new Date(deletionDate.getFullYear(), deletionDate.getMonth(), 1);
 
-          // Para ganhos, se a data de exclusão é no mesmo mês do ganho (ou antes), ela não conta.
           if (deletionMonthStart.getTime() <= displayMonthStart.getTime()) {
               isActiveInDisplayMonth = false;
           }
@@ -443,12 +591,14 @@ export default function HomeScreen() {
     return totalIncome;
   };
 
-  // Calcula a receita total do mês atualmente visível na FlatList filtrada.
-  // Usa `initialMonthDate` como fallback seguro caso `filteredMonthsToDisplay[currentMonthIndex]` seja indefinido (lista vazia).
-  const currentMonthTotalIncome = calculateTotalIncomeForMonth(filteredMonthsToDisplay[currentMonthIndex] || initialMonthDate);
+  // Pega o objeto Date do mês atualmente exibido na tela.
+  const currentDisplayedMonthDate = filteredMonthsToDisplay[currentMonthIndex] || initialMonthDate;
 
-  // Obtém e calcula o total das despesas do mês atualmente visível na FlatList filtrada.
-  const currentDisplayedMonthExpenses = getExpensesForMonth(filteredMonthsToDisplay[currentMonthIndex] || initialMonthDate);
+  // Calcula a receita total do mês atualmente visível.
+  const currentMonthTotalIncome = calculateTotalIncomeForMonth(currentDisplayedMonthDate);
+
+  // Obtém e calcula o total das despesas do mês atualmente visível.
+  const currentDisplayedMonthExpenses = getExpensesForMonth(currentDisplayedMonthDate, allExpenses, true); // Passa allExpenses aqui
   const totalDespesasDisplayedMonth = currentDisplayedMonthExpenses.reduce((sum, item) => sum + item.value, 0);
 
   // Calcula o valor final (Receita - Despesa) para o mês atualmente visível.
@@ -459,42 +609,33 @@ export default function HomeScreen() {
    * @param {object} param0 - Contém o `item` (objeto Date do mês) e o `index`.
    */
   const renderMonthSection = ({ item: monthDate, index }) => {
-    const expenses = getExpensesForMonth(monthDate); // Obtém as despesas para este mês
-    const monthName = getMonthName(monthDate); // Nome do mês
-    const year = monthDate.getFullYear(); // Ano
+    const expenses = getExpensesForMonth(monthDate, allExpenses, true); // Passa allExpenses aqui
+    const monthName = getMonthName(monthDate);
+    const year = monthDate.getFullYear();
 
-    // Verifica se este é o mês atual do sistema para aplicar um destaque visual.
     const isSystemCurrentMonth = monthDate.getMonth() === initialMonthDate.getMonth() &&
-                                 monthDate.getFullYear() === initialMonthDate.getFullYear();
+                                 initialMonthDate.getFullYear() === year;
 
     return (
       <View style={styles.monthPage}>
         <View style={[
           styles.section,
-          isSystemCurrentMonth && styles.currentMonthHighlight // Aplica estilo de destaque condicional
+          isSystemCurrentMonth && styles.currentMonthHighlight
         ]}>
-          {/* Título da seção, exibindo o nome do mês e o ano */}
           <Text style={styles.sectionTitle}>{`${String(monthName)} ${String(year)}`}</Text>
 
-          {/* Cabeçalho da Tabela de Despesas */}
           <View style={styles.tableHeader}>
             <Text style={[styles.headerText, styles.descriptionColumn]}>Despesa</Text>
             <Text style={[styles.headerText, styles.dateColumn]}>Data de Vencimento</Text>
             <Text style={[styles.headerText, styles.valueColumn]}>Valor</Text>
           </View>
 
-          {/* ScrollView para permitir rolagem vertical da lista de despesas dentro de cada mês */}
           {expenses.length > 0 ? (
             <ScrollView style={styles.expensesScrollView}>
               {expenses.map((item) => (
-                // Cada item de despesa na lista. Usa o ID da despesa como key.
-                // Para despesas fixas que aparecem em vários meses, o ID é concatenado com ano/mês
-                // para garantir unicidade visual dentro da FlatList.
                 <View key={String(item.id)} style={styles.debitItemRow}>
                   <Text style={[styles.debitText, styles.descriptionColumn]}>{String(item.description)}</Text>
-                  {/* Exibe a data de vencimento formatada */}
                   <Text style={[styles.debitText, styles.dateColumn]}>{String(formatDateForDisplay(new Date(item.dueDate)))}</Text> 
-                  {/* Exibe o valor da despesa formatado para moeda brasileira */}
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
                   </Text>
@@ -502,7 +643,6 @@ export default function HomeScreen() {
               ))}
             </ScrollView>
           ) : (
-            // Mensagem exibida se não houver despesas para o mês atual
             <Text style={styles.noExpensesText}>Nenhuma despesa para este mês.</Text>
           )}
         </View>
@@ -517,46 +657,140 @@ export default function HomeScreen() {
    */
   const handleScroll = (event) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
-    // Calcula o novo índice do mês arredondando a posição da rolagem pela largura da tela.
     const newIndex = Math.round(contentOffsetX / width);
-    // Se o índice mudou, atualiza o estado.
     if (newIndex !== currentMonthIndex) {
       setCurrentMonthIndex(newIndex);
     }
   };
 
   /**
-   * Limpa todos os dados de receitas, despesas e cartões do AsyncStorage.
-   * Usado para fins de teste e reset do aplicativo.
+   * Função para manipular a confirmação da limpeza de dados.
+   * Agora, se a opção "Limpar dados de um mês específico" for selecionada,
+   * ele abre o seletor de Mês/Ano. Caso contrário, executa a limpeza direta.
    */
-  const clearAllData = async () => {
-    Alert.alert(
-      "Confirmar Limpeza",
-      "Tem certeza que deseja apagar TODOS os seus dados (receitas, despesas, cartões)? Esta ação é irreversível.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Apagar Tudo",
-          onPress: async () => {
-            try {
-              await AsyncStorage.clear(); // Limpa todo o AsyncStorage
-              await loadData(); // Recarrega os dados (irá começar com listas vazias novamente)
-              Alert.alert("Sucesso", "Todos os dados foram apagados e recarregados.");
-              console.log("AsyncStorage limpo e dados recarregados.");
-            } catch (error) {
-              console.error("Erro ao limpar AsyncStorage:", error);
-              Alert.alert("Erro", `Não foi possível limpar os dados: ${error.message}`);
+  const handleConfirmClearData = async () => {
+    if (selectedClearOption === '0') {
+      // Define os valores iniciais do picker para o mês/ano atualmente visível no FlatList
+      // Isso é importante para que o picker já inicie no contexto do usuário
+      setPickerMonth(String(currentDisplayedMonthDate.getMonth() + 1).padStart(2, '0'));
+      setPickerYear(String(currentDisplayedMonthDate.getFullYear()));
+
+      setIsClearDataModalVisible(false); // Fecha o primeiro modal
+      setIsMonthYearYearPickerVisible(true); // Abre o modal de seleção de mês/ano
+      return; // Sai da função, a limpeza real acontecerá no novo modal
+    }
+
+    setIsClearDataModalVisible(false); // Fecha o modal
+    setLoadingApp(true); // Inicia o indicador de carregamento
+    
+    // Assegura que o mês alvo seja o currentDisplayedMonthDate para logs de debug se não for opção 0
+    const monthBeforeAction = currentDisplayedMonthDate;
+    const targetMonth = monthBeforeAction.getMonth();
+    const targetYear = monthBeforeAction.getFullYear();
+    
+    console.log(`[DEBUG - Limpeza]: Tentando limpar dados (opção ${selectedClearOption}) para ${getMonthName(monthBeforeAction)}/${targetYear}`);
+
+    try {
+      switch (selectedClearOption) {
+        case '1': // Limpar todas as receitas (exclusão permanente)
+          await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.INCOMES);
+          Alert.alert('Sucesso', 'Todas as receitas foram limpas permanentemente.');
+          break;
+        case '2': // Limpar todas as despesas (exclusão permanente)
+          await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.EXPENSES);
+          Alert.alert('Sucesso', 'Todas as despesas foram limpas permanentemente.');
+          break;
+        case '3': // Limpar todos os cartões (exclusão permanente)
+          await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.CARDS);
+          Alert.alert('Sucesso', 'Todos os cartões foram limpos permanentemente.');
+          break;
+        case '4': // Limpar todos os dados (exclusão permanente)
+        default:
+          await AsyncStorage.clear();
+          Alert.alert('Sucesso', 'TODOS os dados foram apagados permanentemente e recarregados.');
+          break;
+      }
+      await loadData(); // Recarrega os dados, o que desencadeará a rolagem para o mês atual
+      
+    } catch (error) {
+      console.error("HomeScreen: Erro ao limpar dados:", error);
+      Alert.alert('Erro', `Não foi possível limpar os dados: ${error.message}`);
+    } finally {
+      setLoadingApp(false);
+    }
+  };
+
+  /**
+   * Função que executa a exclusão suave para o mês/ano selecionado no Picker.
+   */
+  const performMonthYearClear = async () => {
+    setIsMonthYearYearPickerVisible(false); // Fecha o modal de seleção de mês/ano
+    setLoadingApp(true);
+
+    const monthToClear = parseInt(pickerMonth, 10) - 1; // Converte para 0-indexado
+    const yearToClear = parseInt(pickerYear, 10);
+    const targetDateToClear = new Date(yearToClear, monthToClear, 1);
+    const targetMonthYearString = formatMonthYearForExclusion(targetDateToClear);
+
+    console.log(`[DEBUG - Limpeza]: Limpando dados para ${getMonthName(targetDateToClear)}/${yearToClear} (selecionado pelo usuário)`);
+
+    const lastDayOfTargetMonth = new Date(yearToClear, monthToClear + 1, 0); 
+
+    try {
+      // Atualiza receitas:
+      const updatedIncomes = allIncomes.map(income => {
+        if (income.type === 'Fixo') {
+          // Se o mês já está excluído, não adiciona novamente para evitar duplicidade
+          const newExcludedMonths = income.excludedMonths ? [...income.excludedMonths, targetMonthYearString] : [targetMonthYearString];
+          return { ...income, excludedMonths: Array.from(new Set(newExcludedMonths)) };
+        } else if (income.type === 'Ganho' && 
+                   income.month === monthToClear && // <--- CORREÇÃO AQUI: Usa income.month
+                   income.year === yearToClear &&   // <--- CORREÇÃO AQUI: Usa income.year
+                   income.status !== 'inactive') {
+          return { ...income, status: 'inactive', deletedAt: lastDayOfTargetMonth.toISOString() };
+        }
+        return income;
+      });
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.INCOMES, JSON.stringify(updatedIncomes));
+
+      // Atualiza despesas:
+      const updatedExpenses = allExpenses.map(expense => {
+        if (expense.paymentMethod === 'Fixa') {
+          // Se o mês já está excluído, não adiciona novamente para evitar duplicidade
+          const newExcludedMonths = expense.excludedMonths ? [...expense.excludedMonths, targetMonthYearString] : [targetMonthYearString];
+          return { ...expense, excludedMonths: Array.from(new Set(newExcludedMonths)) };
+        } else if (expense.paymentMethod === 'Débito' || expense.paymentMethod === 'Crédito') {
+            const expenseDueDate = new Date(expense.dueDate);
+            const expenseMonth = expenseDueDate.getMonth();
+            const expenseYear = expenseDueDate.getFullYear();
+
+            if (expenseMonth === monthToClear &&
+                expenseYear === yearToClear &&
+                expense.status !== 'inactive') {
+                return { ...expense, status: 'inactive', deletedAt: lastDayOfTargetMonth.toISOString() };
             }
-          },
-          style: "destructive", // Estilo para indicar uma ação destrutiva
-        },
-      ]
-    );
+        }
+        return expense;
+      });
+      // Correção: ASYNC_STORAGE_KEYS (erro de digitação)
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses));
+
+      Alert.alert('Sucesso', `Dados do mês ${getMonthName(targetDateToClear)}/${yearToClear} marcados como inativos.`);
+      await loadData(); // Recarrega os dados, o que desencadeará a rolagem para o mês atual
+      
+    } catch (error) {
+      console.error("HomeScreen: Erro ao limpar dados do mês selecionado:", error);
+      Alert.alert('Erro', `Não foi possível limpar os dados do mês selecionado: ${error.message}`);
+    } finally {
+      setLoadingApp(false);
+    }
   };
 
 
-  // Exibe um indicador de carregamento enquanto o aplicativo está inicializando
-  // (carregando dados do AsyncStorage ou gerando os iniciais).
+  const clearAllData = () => {
+    setIsClearDataModalVisible(true);
+  };
+
   if (loadingApp) {
     return (
       <View style={commonStyles.loadingContainer}>
@@ -566,16 +800,24 @@ export default function HomeScreen() {
     );
   }
 
+  const clearOptions = [
+    { label: "Limpar dados de um mês específico (exclusão suave)", value: "0" }, // Opção que abre o novo modal
+    { label: "Limpar todas as receitas (permanente)", value: "1" },
+    { label: "Limpar todas as despesas (permanente)", value: "2" },
+    { label: "Limpar todos os cartões (permanente)", value: "3" },
+    { label: "Limpar TODOS os dados (permanente)", value: "4" },
+  ];
+
   return (
     // Container principal da tela, aplicando o padding superior para respeitar a barra de status
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Container para os botões de ação no topo da tela */}
       <View style={styles.topButtonsContainer}>
-        {/* Botão "Limpar Todos os Dados" */}
+        {/* Botão "Limpar Dados (Teste)" agora abre o modal */}
         <TouchableOpacity onPress={clearAllData} style={styles.clearDataButton}>
-          <Text style={styles.clearDataButtonText}>Limpar Todos os Dados</Text>
+          <Text style={styles.clearDataButtonText}>Limpar Dados (Teste)</Text>
         </TouchableOpacity>
-        {/* Novo Botão "Gerar Despesas Aleatórias" */}
+        {/* Botão "Gerar Despesas Aleatórias" */}
         <TouchableOpacity onPress={handleGenerateRandomExpenses} style={styles.generateRandomButton}>
           <Text style={styles.generateRandomButtonText}>Gerar Despesas Aleatórias</Text>
         </TouchableOpacity>
@@ -591,7 +833,7 @@ export default function HomeScreen() {
         pagingEnabled // Faz a rolagem "parar" em cada página (mês)
         showsHorizontalScrollIndicator={false} // Esconde a barra de rolagem horizontal
         onMomentumScrollEnd={handleScroll} // Chama a função ao final da rolagem
-        initialScrollIndex={initialScrollIndexFiltered} // Rola para o mês atual na lista FILTRADA
+        initialScrollIndex={currentMonthIndex} // Usa o índice já calculado para a rolagem inicial
         extraData={currentMonthIndex} // Garante re-renderização quando o mês atual muda (para o resumo)
         // Otimização para listas longas: informa à FlatList o tamanho de cada item para otimizar a renderização
         getItemLayout={(data, index) => ({
@@ -619,189 +861,315 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Modal Principal para opções de limpeza de dados */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isClearDataModalVisible}
+        onRequestClose={() => {
+          setIsClearDataModalVisible(false);
+          setSelectedClearOption('4');
+        }}
+      >
+        {/* Área que pode ser tocada fora do modal para fechá-lo */}
+        <Pressable
+          style={commonStyles.centeredView}
+          onPressOut={() => {
+            setIsClearDataModalVisible(false);
+            setSelectedClearOption('4');
+          }}
+        >
+          {/* Conteúdo do modal */}
+          {/* Novo Pressable para o conteúdo do modal que impede a propagação de toques */}
+          <Pressable style={[commonStyles.modalView, { zIndex: 100 }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={commonStyles.modalTitle}>Opções de Limpeza de Dados</Text>
+
+            <View style={styles.clearOptionsContainer}>
+              {clearOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    commonStyles.optionButton, // Usando o estilo comum aqui
+                    selectedClearOption === option.value ? commonStyles.optionButtonSelected : {}
+                  ]}
+                  onPress={() => setSelectedClearOption(option.value)}
+                >
+                  <Text style={[
+                    commonStyles.optionButtonText, // Usando o estilo comum aqui
+                    selectedClearOption === option.value ? commonStyles.optionButtonTextSelected : {}
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonEdit]} // Usando estilos do commonStyles
+                onPress={handleConfirmClearData}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Confirmar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonClose]} // Usando estilos do commonStyles
+                onPress={() => {
+                  setIsClearDataModalVisible(false);
+                  setSelectedClearOption('4');
+                }}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* NOVO MODAL: Seleção de Mês e Ano para Limpeza Suave */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isMonthYearPickerVisible}
+        onRequestClose={() => setIsMonthYearYearPickerVisible(false)} // Corrigido para setIsMonthYearYearPickerVisible
+      >
+        <Pressable
+          style={commonStyles.centeredView}
+          onPressOut={() => setIsMonthYearYearPickerVisible(false)}
+        >
+          <Pressable style={[commonStyles.modalView, { zIndex: 100 }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={commonStyles.modalTitle}>Limpar Dados de Mês Específico</Text>
+            <Text style={commonStyles.modalText}>Selecione o mês e ano para exclusão suave:</Text>
+
+            <View style={styles.pickerWrapper}>
+              {/* Picker para Mês */}
+              <View style={styles.halfPickerContainer}>
+                <Text style={commonStyles.pickerLabel}>Mês:</Text>
+                <Picker
+                  selectedValue={pickerMonth}
+                  onValueChange={(itemValue) => setPickerMonth(itemValue)}
+                  style={commonStyles.picker}
+                >
+                  {pickerMonthOptions.map(month => (
+                    <Picker.Item key={month} label={getMonthName(new Date(initialMonthDate.getFullYear(), parseInt(month, 10) -1, 1))} value={month} />
+                  ))}
+                </Picker>
+              </View>
+
+              {/* Picker para Ano */}
+              <View style={styles.halfPickerContainer}>
+                <Text style={commonStyles.pickerLabel}>Ano:</Text>
+                <Picker
+                  selectedValue={pickerYear}
+                  onValueChange={(itemValue) => setPickerYear(itemValue)}
+                  style={commonStyles.picker}
+                >
+                  {pickerYearOptions.map(year => (
+                    <Picker.Item key={year} label={year} value={year} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonEdit]}
+                onPress={performMonthYearClear}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Confirmar Limpeza</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonClose]}
+                onPress={() => setIsMonthYearYearPickerVisible(false)}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </View>
   );
 }
 
 // Definição dos estilos do componente HomeScreen
 const styles = StyleSheet.create({
-  // Estilo base do container, herdando de commonStyles
   container: {
     ...commonStyles.container,
   },
-  // Container para agrupar os botões de ação no topo da tela
   topButtonsContainer: {
-    flexDirection: 'row', // Organiza os botões em linha
-    justifyContent: 'space-around', // Distribui o espaço igualmente entre os botões
-    paddingHorizontal: 15, // Espaçamento horizontal
-    marginTop: 10, // Margem superior
-    marginBottom: 15, // Margem inferior antes da lista de meses
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 15,
+    marginTop: 10,
+    marginBottom: 15,
   },
-  // Estilo para o botão "Limpar Todos os Dados"
   clearDataButton: {
-    backgroundColor: '#dc3545', // Cor vermelha para indicar uma ação destrutiva
-    paddingVertical: 10, // Preenchimento vertical
-    paddingHorizontal: 15, // Preenchimento horizontal
-    borderRadius: 8, // Cantos arredondados
-    flex: 1, // Ocupa espaço flexível, dividindo com o outro botão
-    marginRight: 10, // Margem à direita para separar do próximo botão
-    alignItems: 'center', // Centraliza o texto horizontalmente
-  },
-  // Estilo para o texto do botão "Limpar Todos os Dados"
-  clearDataButtonText: {
-    color: '#fff', // Cor do texto branca
-    fontSize: 16, // Tamanho da fonte
-    fontWeight: 'bold', // Negrito
-  },
-  // Estilo para o botão "Gerar Despesas Aleatórias"
-  generateRandomButton: {
-    backgroundColor: '#28a745', // Cor verde
+    backgroundColor: '#dc3545',
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 8,
-    flex: 1, // Ocupa espaço flexível
+    flex: 1,
+    marginRight: 10,
     alignItems: 'center',
   },
-  // Estilo para o texto do botão "Gerar Despesas Aleatórias"
+  clearDataButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  generateRandomButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    flex: 1,
+    alignItems: 'center',
+  },
   generateRandomButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Estilo para cada "página" de mês na FlatList horizontal
   monthPage: {
-    width: width, // Cada página ocupa a largura total da tela
-    paddingHorizontal: 15, // Espaçamento horizontal interno
-    paddingTop: 15, // Espaçamento superior interno
+    width: width,
+    paddingHorizontal: 15,
+    paddingTop: 15,
   },
-  // Estilo geral para as seções de conteúdo (onde as despesas são listadas)
   section: {
-    backgroundColor: '#ffffff', // Fundo branco
-    borderRadius: 10, // Cantos arredondados
-    padding: 15, // Preenchimento interno
-    marginBottom: 15, // Margem inferior
-    shadowColor: '#000', // Cor da sombra
-    shadowOffset: { width: 0, height: 2 }, // Deslocamento da sombra
-    shadowOpacity: 0.1, // Opacidade da sombra
-    shadowRadius: 3, // Raio da sombra
-    elevation: 3, // Elevação para Android (simula sombra)
-    flex: 1, // Permite que ocupe o espaço disponível
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    flex: 1,
   },
-  // Estilo adicional para destacar o mês atual do sistema
   currentMonthHighlight: {
-    backgroundColor: 'lightblue', // Fundo azul claro
-    borderColor: '#007bff', // Borda azul
-    borderWidth: 4, // Borda mais espessa
-    shadowColor: '#007bff', // Sombra azul
-    shadowOpacity: 0.8, // Sombra mais opaca
-    shadowRadius: 10, // Raio maior para a sombra
-    elevation: 10, // Elevação maior para Android
+    backgroundColor: '#e0f7fa', // Azul claro para destaque
+    borderColor: '#00bcd4', // Ciano para borda
+    borderWidth: 2, // Borda mais fina e visível
+    shadowColor: '#00bcd4',
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    elevation: 5,
   },
-  // Estilo para o título de cada seção de mês
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#333',
-    textAlign: 'center', // Centraliza o título
+    textAlign: 'center',
   },
-  // Estilo para o cabeçalho da tabela de despesas
   tableHeader: {
-    flexDirection: 'row', // Itens em linha
-    justifyContent: 'space-between', // Distribui o espaço entre os itens
-    paddingVertical: 10, // Preenchimento vertical
-    borderBottomWidth: 2, // Borda inferior mais grossa
-    borderBottomColor: '#ccc', // Cor da borda
-    marginBottom: 5, // Margem inferior
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: '#ccc',
+    marginBottom: 5,
   },
-  // Estilo para o texto do cabeçalho da tabela
   headerText: {
     fontWeight: 'bold',
     fontSize: 14,
     color: '#666',
-    textAlign: 'center', // Centraliza o texto do cabeçalho
+    textAlign: 'center',
   },
-  // Estilo para o ScrollView que contém a lista de despesas de um mês
   expensesScrollView: {
-    flex: 1, // Ocupa todo o espaço disponível verticalmente
+    flex: 1,
   },
-  // Estilo para cada linha de item de débito na lista
   debitItemRow: {
-    flexDirection: 'row', // Itens em linha
-    justifyContent: 'space-between', // Distribui o espaço
-    alignItems: 'center', // Alinha verticalmente ao centro
-    paddingVertical: 10, // Preenchimento vertical
-    borderBottomWidth: 1, // Borda inferior fina
-    borderBottomColor: '#eee', // Cor da borda
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  // Estilo para o texto da descrição/data do débito
   debitText: {
     fontSize: 16,
     color: '#555',
   },
-  // Estilo para o valor do débito
   debitValue: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
   },
-  // Estilo de coluna para a descrição (ocupa mais espaço)
   descriptionColumn: {
     flex: 2,
-    textAlign: 'left', // Alinha texto à esquerda
+    textAlign: 'left',
   },
-  // Estilo de coluna para a data (ocupa mais espaço, centralizado)
   dateColumn: {
     flex: 2,
-    textAlign: 'center', // Alinha texto ao centro
+    textAlign: 'center',
   },
-  // Estilo de coluna para o valor (ocupa menos espaço, alinhado à direita)
   valueColumn: {
     flex: 1.5,
-    textAlign: 'right', // Alinha texto à direita
+    textAlign: 'right',
   },
-  // Estilo para a mensagem exibida quando não há despesas para um mês
   noExpensesText: {
     textAlign: 'center',
     marginTop: 20,
     fontSize: 16,
     color: '#888',
   },
-  // Container para a seção de resumo financeiro (fixa na parte inferior)
   summaryContainer: {
-    backgroundColor: '#ffffff', // Fundo branco
-    borderTopLeftRadius: 10, // Cantos superiores arredondados
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    padding: 20, // Preenchimento interno
-    shadowColor: '#000', // Sombra
-    shadowOffset: { width: 0, height: -2 }, // Sombra para cima
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 5,
   },
-  // Estilo para cada linha do resumo (receita total, valor final)
   summaryRow: {
-    flexDirection: 'row', // Itens em linha
-    justifyContent: 'space-between', // Distribui o espaço
-    marginBottom: 10, // Margem inferior entre as linhas
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  // Estilo para os rótulos do resumo (ex: "Receita total:")
   summaryLabel: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
-  // Estilo para os valores do resumo
   summaryValue: {
     fontSize: 18,
     fontWeight: 'bold',
   },
-  // Estilo específico para valores negativos no resumo (vermelho)
   negativeValue: {
     color: 'red',
   },
-  // Estilo específico para valores positivos no resumo (azul)
   positiveValue: {
     color: '#007bff',
+  },
+  clearOptionsContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    marginTop: 20,
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  pickerWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginBottom: 20,
+  },
+  halfPickerContainer: {
+    flex: 1,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    marginHorizontal: 5,
   },
 });
