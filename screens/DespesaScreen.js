@@ -50,6 +50,11 @@
  *
  * REVERSÃO DO PICKER DE DIA FIXO: O `@react-native-picker/picker` para o "Dia do Pagamento (1-31)"
  * e o modal customizado foram removidos. O campo de seleção de dia voltou a ser um TextInput simples.
+ *
+ * CORREÇÃO DE DATAS CRÍTICA (Fase 1.7): Lógica de cálculo de `dueDate` para despesas de crédito e fixas
+ * foi revista e aprimorada para garantir que o dia de vencimento seja corretamente ajustado
+ * para o último dia do mês quando o dia configurado (ex: 31) não existir no mês em questão.
+ * Isso resolve os problemas de parcelas "saltando" para o próximo mês ou exibindo datas erradas.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -67,6 +72,16 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 import { useFocusEffect } from '@react-navigation/native'; 
 
 /**
+ * Função auxiliar para obter o último dia de um determinado mês e ano.
+ * @param {number} year - O ano.
+ * @param {number} month - O mês (0-indexado, 0 para Janeiro, 11 para Dezembro).
+ * @returns {number} O último dia do mês.
+ */
+const getLastDayOfMonth = (year, month) => {
+    return new Date(year, month + 1, 0).getDate();
+};
+
+/**
  * Função auxiliar para calcular a primeira data de vencimento de uma compra de crédito,
  * considerando o dia de vencimento do cartão e a data da compra.
  * Se a data da compra for APÓS o dia de vencimento do cartão no mês atual,
@@ -82,26 +97,51 @@ const getFirstCreditDueDate = (purchaseDate, cardDueDayOfMonth) => {
   let month = pDate.getMonth();
   let day = cardDueDayOfMonth;
 
+  // Se a data da compra for APÓS o dia de vencimento do cartão no mês atual,
+  // a primeira parcela começa no próximo ciclo de fatura.
   if (pDate.getDate() >= cardDueDayOfMonth) {
-    month += 1;
+    month += 1; // Avança para o próximo mês
+    if (month > 11) {
+      month = 0; // Janeiro do próximo ano
+      year += 1;
+    }
   }
 
-  if (month > 11) {
-    month = 0; // Janeiro
-    year += 1;
+  // Garante que o dia não exceda o último dia do mês alvo.
+  const lastDayInTargetMonth = getLastDayOfMonth(year, month);
+  if (day > lastDayInTargetMonth) {
+    day = lastDayInTargetMonth;
   }
 
-  let calculatedDueDate = new Date(year, month, day);
-
-  // Se o dia do mês for maior que os dias do mês calculado (ex: 31 de fevereiro),
-  // ajusta para o último dia do mês.
-  if (calculatedDueDate.getMonth() !== month) {
-    calculatedDueDate = new Date(year, month + 1, 0); 
-  }
-
-  return calculatedDueDate;
+  return new Date(year, month, day);
 };
 
+/**
+ * Função auxiliar para calcular a data de vencimento da próxima parcela de crédito,
+ * ajustando para o último dia do mês se o `cardDueDayOfMonth` não existir.
+ * @param {Date} previousDueDate - A data de vencimento da parcela anterior.
+ * @param {number} cardDueDayOfMonth - O dia de vencimento original do cartão (1-31).
+ * @returns {Date} O objeto Date da próxima data de vencimento da parcela.
+ */
+const getNextInstallmentDueDate = (previousDueDate, cardDueDayOfMonth) => {
+    let year = previousDueDate.getFullYear();
+    let month = previousDueDate.getMonth();
+    
+    // Avança para o próximo mês
+    month += 1;
+    if (month > 11) {
+        month = 0;
+        year += 1;
+    }
+
+    let day = cardDueDayOfMonth;
+    const lastDayInTargetMonth = getLastDayOfMonth(year, month);
+    if (day > lastDayInTargetMonth) {
+        day = lastDayInTargetMonth; // Ajusta para o último dia do mês
+    }
+
+    return new Date(year, month, day);
+};
 
 export default function DespesaScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -117,8 +157,6 @@ export default function DespesaScreen({ navigation, route }) {
 
   // Estado para o dia de vencimento de despesas fixas
   const [fixedExpenseDueDay, setFixedExpenseDueDay] = useState('1'); 
-  // Removido estado para visibilidade do modal de seleção de dia fixo
-  // const [isFixedDayModalVisible, setIsFixedDayModalVisible] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
   const [savingExpense, setSavingExpense] = useState(false);
@@ -292,7 +330,15 @@ export default function DespesaScreen({ navigation, route }) {
           updatedExpense.dueDate = route.params.expenseToEdit.dueDate; 
           delete updatedExpense.dueDayOfMonth;
         } else if (paymentMethod === 'Fixa') {
-          updatedExpense.dueDayOfMonth = parseInt(fixedExpenseDueDay, 10);
+          // Garante que o fixedExpenseDueDay seja ajustado para o último dia do mês se necessário
+          let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
+          const currentMonth = new Date().getMonth();
+          const currentYear = new Date().getFullYear();
+          const lastDayOfCurrentMonth = getLastDayOfMonth(currentYear, currentMonth);
+          if (dayForFixedExpense > lastDayOfCurrentMonth) {
+              dayForFixedExpense = lastDayOfCurrentMonth;
+          }
+          updatedExpense.dueDayOfMonth = dayForFixedExpense;
           delete updatedExpense.purchaseDate;
           delete updatedExpense.cardId;
           delete updatedExpense.installmentNumber;
@@ -356,20 +402,27 @@ export default function DespesaScreen({ navigation, route }) {
               status: 'pending',
             };
             expenses.push(installmentData);
-            
-            currentDueDate.setMonth(currentDueDate.getMonth() + 1);
-            if (currentDueDate.getDate() !== dueDayOfMonthCard && currentDueDate.getMonth() !== new Date(currentDueDate.getFullYear(), currentDueDate.getMonth(), dueDayOfMonthCard).getMonth()) {
-                currentDueDate.setDate(new Date(currentDueDate.getFullYear(), currentDueDate.getMonth() + 1, 0).getDate());
+            if (i < totalNumInstallments) { // Só calcula a próxima data se houver mais parcelas
+                currentDueDate = getNextInstallmentDueDate(currentDueDate, dueDayOfMonthCard);
             }
           }
           Alert.alert('Sucesso', `${totalNumInstallments} parcelas de crédito adicionadas com sucesso!`);
           console.log("Parcelas de crédito adicionadas, originalExpenseId:", originalExpenseUniqueId);
         } else if (paymentMethod === 'Fixa') {
+          // Garante que o fixedExpenseDueDay seja ajustado para o último dia do mês se necessário
+          let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
+          const currentMonth = new Date().getMonth();
+          const currentYear = new Date().getFullYear();
+          const lastDayOfCurrentMonth = getLastDayOfMonth(currentYear, currentMonth);
+          if (dayForFixedExpense > lastDayOfCurrentMonth) {
+              dayForFixedExpense = lastDayOfCurrentMonth;
+          }
+
           const newExpense = {
             ...expenseDataTemplate,
             id: Date.now().toString(),
             status: 'active',
-            dueDayOfMonth: parseInt(fixedExpenseDueDay, 10),
+            dueDayOfMonth: dayForFixedExpense,
           };
           expenses.push(newExpense);
           Alert.alert('Sucesso', 'Despesa fixa adicionada com sucesso!');
@@ -408,19 +461,6 @@ export default function DespesaScreen({ navigation, route }) {
       setSavingExpense(false);
     }
   };
-
-  // Removido renderDayItem
-  // const renderDayItem = ({ item }) => (
-  //   <TouchableOpacity
-  //     style={styles.dayItem}
-  //     onPress={() => {
-  //       setFixedExpenseDueDay(String(item));
-  //       setIsFixedDayModalVisible(false);
-  //     }}
-  //   >
-  //     <Text style={styles.dayItemText}>{String(item).padStart(2, '0')}</Text>
-  //   </TouchableOpacity>
-  // );
 
   return (
     <View style={[commonStyles.container, { paddingTop: insets.top }]}>
@@ -594,9 +634,6 @@ export default function DespesaScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Removido o Modal para seleção do Dia do Pagamento Fixo */}
-      {/* <Modal ...> ... </Modal> */}
     </View>
   );
 }
@@ -649,10 +686,4 @@ const styles = StyleSheet.create({
     height: 50,
     width: '100%',
   },
-  // Removidos estilos relacionados ao Modal de seleção de dia fixo
-  // modalContent: { ... },
-  // modalPickerTitle: { ... },
-  // daysListContainer: { ... },
-  // dayItem: { ... },
-  // dayItemText: { ... },
 });

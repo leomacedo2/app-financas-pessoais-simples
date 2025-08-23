@@ -1,51 +1,4 @@
 // screens/HomeScreen.js
-
-/**
- * @file HomeScreen.js
- * @description Esta tela é a principal do aplicativo, exibindo um resumo financeiro
- * e uma lista horizontal rolável de despesas por mês.
- *
- * Funcionalidades principais:
- * - Exibição paginada de despesas para meses passados e futuros.
- * - Cálculo e exibição da receita total e valor final para o mês visível.
- * - Geração de despesas aleatórias para TODOS os meses no range.
- * - O mês atual do sistema é SEMPRE exibido na FlatList e a rolagem inicial vai para ele.
- * - Sincronização de dados de receitas e despesas com AsyncStorage.
- * - Modal aprimorado para limpeza de dados, permitindo a seleção de Mês/Ano para exclusão suave.
- *
- * Correções e Melhorias CRÍTICAS (Versão Final para Flicker):
- * 1.  **RESOLVIDO DEFINITIVAMENTE: Flicker de Rolagem (Agosto 2024 -> Agosto 2025)**:
- * A lógica de inicialização da rolagem foi **completamente reestruturada**.
- * Agora, o `currentMonthIndex` (que serve como `initialScrollIndex` da `FlatList`)
- * é calculado e atualizado *dentro do `loadData`*, logo após o carregamento dos dados
- * e a estabilização da lista de meses filtrados (`filteredMonthsToDisplay`).
- * Isso garante que a `FlatList` já renderize no mês correto (Agosto de 2025) desde
- * a sua primeira aparição após o `loadingApp` ser `false`, eliminando o flicker.
- * 2.  **`initialScrollIndex` Confiável**: A `FlatList` usa diretamente o `currentMonthIndex`
- * (já pré-calculado e correto) para sua posição inicial.
- * 3.  **Funções de Filtro de Dados Refatoradas**: `getExpensesForMonth` e `getIncomesForMonth`
- * agora aceitam os arrays de dados (`incomesData`, `expensesData`) como argumentos,
- * garantindo consistência no cálculo de `filteredMonthsToDisplay` durante o `loadData`.
- * 4.  **`ReferenceError` em `ASYNC_STORAGE_KEYS`**: O erro de digitação
- * `ASYC_STORAGE_KEYS` foi corrigido para `ASYNC_STORAGE_KEYS` na função
- * `performMonthYearClear`. Este erro já havia sido corrigido na versão anterior e foi mantido.
- * 5.  **NOVO: CORRIGIDO: Exclusão Incorreta de Receitas 'Ganho' no Modal de Limpeza**:
- * A lógica de exclusão suave para receitas do tipo 'Ganho' no modal de limpeza mês-a-mês
- * foi corrigida para usar as propriedades `income.month` e `income.year` (que indicam
- * o mês ao qual o ganho se refere) em vez de `income.createdAt` (data de criação do registro).
- * Isso garante que apenas as receitas de 'Ganho' que realmente *pertencem* ao mês
- * selecionado para limpeza sejam marcadas como inativas.
- * 6. **NOVO: Suporte a `dueDayOfMonth` para despesas `Fixa`**: A função `getExpensesForMonth`
- * foi atualizada para considerar o `dueDayOfMonth` para despesas do tipo `Fixa`,
- * garantindo que a data de vencimento seja corretamente exibida e filtrada.
- *
- * **CORREÇÃO:** Botões de "Limpar Dados" e "Gerar Despesas Aleatórias" no topo agora usam
- * estilos do commonStyles para garantir layout correto.
- * **CORREÇÃO:** Modal de opções de limpeza agora usa `commonStyles.optionButton` para as opções
- * e `commonStyles.modalActionButtonsContainer` para os botões "Confirmar" e "Cancelar".
- * **CORREÇÃO:** Erro "Text strings must be rendered within a <Text> component" no modal de limpeza.
- */
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -218,6 +171,16 @@ export default function HomeScreen() {
   const scrollAttempted = useRef(false);
 
   /**
+   * Função auxiliar para obter o último dia de um determinado mês e ano.
+   * @param {number} year - O ano.
+   * @param {number} month - O mês (0-indexado).
+   * @returns {number} O último dia do mês.
+   */
+  const getLastDayOfMonth = (year, month) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  /**
    * Filtra as despesas do array 'expensesData' que são relevantes para um mês específico.
    * Inclui lógica para despesas 'Fixa', 'Débito' e 'Crédito', e respeita a exclusão suave.
    * Também verifica se o item fixo está excluído para o mês atual.
@@ -263,10 +226,10 @@ export default function HomeScreen() {
         // Despesas fixas só aparecem a partir do mês em que foram criadas.
         if (createdAtMonthStart <= displayMonthStartTimestamp) {
           let dayForFixedExpense = item.dueDayOfMonth || 1;
-          const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-
+          const lastDayOfTargetMonth = getLastDayOfMonth(targetYear, targetMonth); // Usa getLastDayOfMonth
+          
           if (dayForFixedExpense > lastDayOfTargetMonth) {
-            dayForFixedExpense = lastDayOfTargetMonth;
+            dayForFixedExpense = lastDayOfTargetMonth; // Ajusta para o último dia do mês
           }
 
           const fixedDueDate = new Date(targetYear, targetMonth, dayForFixedExpense);
@@ -274,8 +237,8 @@ export default function HomeScreen() {
           expensesForThisMonth.push({
             ...item,
             dueDate: fixedDueDate.toISOString(), // Usa o dueDate calculado para despesas fixas
-            id: `${item.id}-${targetYear}-${targetMonth}`,
-            description: `${item.description} (Fixo)` 
+            id: `${item.id}-${targetYear}-${targetMonth}`, // ID único para a despesa fixa do mês
+            description: `${item.description}` 
           });
         }
       }
@@ -645,11 +608,8 @@ export default function HomeScreen() {
                 <View key={String(item.id)} style={styles.debitItemRow}>
                   <Text style={[styles.debitText, styles.descriptionColumn]}>{String(item.description)}</Text>
                   <Text style={[styles.debitText, styles.dateColumn]}>
-                    {/* Se for despesa fixa, exibe "Dia X", senão a data completa */}
-                    {item.paymentMethod === 'Fixa' 
-                      ? `Dia ${String(item.dueDayOfMonth || '1').padStart(2, '0')}` // Garante que é string e padStart
-                      : String(formatDateForDisplay(new Date(item.dueDate)))
-                    }
+                    {/* Exibe sempre a data formatada, seja de débito/crédito ou fixa */}
+                    {String(formatDateForDisplay(new Date(item.dueDate)))}
                   </Text> 
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
