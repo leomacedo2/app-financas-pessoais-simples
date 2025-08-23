@@ -43,6 +43,11 @@
  * DEBUG E CORREÇÃO "UNDEFINED": Adicionado `console.log` para inspecionar os cartões carregados.
  * A propriedade `label` dos `Picker.Item`s de cartão agora usa `String(card.alias || '')`
  * para garantir que nunca seja `undefined` ou `null`, resolvendo o erro e a exibição de "undefined".
+ *
+ * CORREÇÃO CRÍTICA DO PICKER: Refatorado o placeholder do seletor de cartões.
+ * O `Picker.Item` de placeholder agora é renderizado sempre como o primeiro item,
+ * sem a propriedade `enabled={false}`, para evitar erros de "Text strings must be rendered within a <Text> component"
+ * que podem surgir de comportamentos inconsistentes do `Picker` com itens desabilitados ou `value`s específicos.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -133,12 +138,12 @@ export default function DespesaScreen({ navigation, route }) {
 
       if (activeCards.length > 0) {
         // Se já houver um cartão selecionado e ele ainda estiver ativo, mantém.
-        // Caso contrário, seleciona o primeiro cartão ativo.
+        // Caso contrário, seleciona o primeiro cartão ativo (ou o placeholder '' se não houver um padrão).
         if (!selectedCardId || !activeCards.some(card => card.id === selectedCardId)) {
           setSelectedCardId(activeCards[0].id);
         }
       } else {
-        setSelectedCardId(''); // Alterado de null para ''
+        setSelectedCardId(''); // Se não houver cartões, define para o placeholder
       }
     } catch (error) {
       console.error("DespesaScreen: Erro ao carregar cartões do AsyncStorage:", error);
@@ -508,8 +513,8 @@ export default function DespesaScreen({ navigation, route }) {
                     onValueChange={(itemValue) => setSelectedCardId(itemValue)}
                     style={styles.pickerStyleOverride}
                   >
-                    {/* Placeholder para o Picker de Cartões, sem estilo direto no Picker.Item */}
-                    {selectedCardId === '' && <Picker.Item label="Selecione um Cartão" value="" enabled={false} />}
+                    {/* Placeholder sempre como o primeiro item, com value="" */}
+                    <Picker.Item label="Selecione um Cartão" value="" />
                     {cards.map(card => (
                       <Picker.Item key={card.id} label={String(card.alias || '')} value={card.id} />
                     ))}
