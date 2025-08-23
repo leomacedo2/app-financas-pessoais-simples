@@ -27,6 +27,9 @@
  *
  * ATUALIZAÇÃO RECENTE: O campo "Dia do Pagamento" para despesas do tipo "Fixa" agora é um Picker,
  * permitindo a seleção de um dia válido (1-31) em vez de um TextInput.
+ *
+ * CORREÇÃO ATUAL 2: Resolvido o erro "Text strings must be rendered within a <Text> component"
+ * que retornou após as últimas mudanças no Picker.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -508,8 +511,8 @@ export default function DespesaScreen({ navigation, route }) {
                     onValueChange={(itemValue) => setSelectedCardId(itemValue)}
                     style={styles.pickerStyleOverride}
                   >
-                    {/* Placeholder para o Picker de Cartões, se nenhum estiver selecionado */}
-                    {!selectedCardId && <Picker.Item label="Selecione um Cartão" value={null} enabled={false} style={{color: '#999'}} />}
+                    {/* Alterado para garantir que a label do placeholder seja sempre um componente Text */}
+                    {selectedCardId === null && <Picker.Item label="Selecione um Cartão" value={null} enabled={false} style={{color: '#999'}} />}
                     {cards.map(card => (
                       <Picker.Item key={card.id} label={card.alias} value={card.id} />
                     ))}
