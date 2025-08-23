@@ -29,7 +29,9 @@
  * permitindo a seleção de um dia válido (1-31) em vez de um TextInput.
  *
  * CORREÇÃO ATUAL 2: Resolvido o erro "Text strings must be rendered within a <Text> component"
- * que retornou após as últimas mudanças no Picker.
+ * que retornou após as últimas mudanças no Picker. A correção é feita garantindo
+ * que todos os Picker.Items sejam gerados diretamente no JSX para o Picker de Despesa Fixa,
+ * e a label do placeholder do Picker de Cartões seja explicitamente uma string.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -200,19 +202,6 @@ export default function DespesaScreen({ navigation, route }) {
     setShowDatePicker(true);
   };
 
-  /**
-   * Gera os itens <Picker.Item> para o seletor de dia (1 a 31).
-   * @returns {JSX.Element[]} Um array de componentes Picker.Item.
-   */
-  const renderDayPickerItems = () => {
-    const days = [];
-    for (let i = 1; i <= 31; i++) {
-      // Garante que label e value sejam strings numéricas explícitas
-      days.push(<Picker.Item key={String(i)} label={String(i).padStart(2, '0')} value={String(i)} />);
-    }
-    return days;
-  };
-
   const handleSaveExpense = async () => {
     if (!expenseName.trim() || !expenseValue.trim()) {
       Alert.alert('Erro', 'Por favor, preencha a descrição e o valor da despesa.');
@@ -346,11 +335,7 @@ export default function DespesaScreen({ navigation, route }) {
             };
             expenses.push(installmentData);
             
-            // Avança para o próximo mês.
-            // A lógica de ajustar para o último dia do mês (se o dia original for maior)
-            // já está contida em getFirstCreditDueDate, então aqui apenas avança o mês.
             currentDueDate.setMonth(currentDueDate.getMonth() + 1);
-            // Corrige o dia se o mês resultante for menor (ex: 31 de janeiro para fevereiro, se o dia for 31)
             if (currentDueDate.getDate() !== dueDayOfMonthCard && currentDueDate.getMonth() !== new Date(currentDueDate.getFullYear(), currentDueDate.getMonth(), dueDayOfMonthCard).getMonth()) {
                 currentDueDate.setDate(new Date(currentDueDate.getFullYear(), currentDueDate.getMonth() + 1, 0).getDate());
             }
@@ -376,7 +361,6 @@ export default function DespesaScreen({ navigation, route }) {
       setExpenseValue('');
       setPaymentMethod('Débito');
       setPurchaseDate(new Date());
-      // Garante que o selectedCardId seja resetado corretamente para o primeiro cartão se houver, ou null.
       if (cards.length > 0) {
         setSelectedCardId(cards[0].id);
       } else {
@@ -511,8 +495,7 @@ export default function DespesaScreen({ navigation, route }) {
                     onValueChange={(itemValue) => setSelectedCardId(itemValue)}
                     style={styles.pickerStyleOverride}
                   >
-                    {/* Alterado para garantir que a label do placeholder seja sempre um componente Text */}
-                    {selectedCardId === null && <Picker.Item label="Selecione um Cartão" value={null} enabled={false} style={{color: '#999'}} />}
+                    {selectedCardId === null && <Picker.Item label="Selecione um Cartão" value="" enabled={false} style={{color: '#999'}} />}
                     {cards.map(card => (
                       <Picker.Item key={card.id} label={card.alias} value={card.id} />
                     ))}
@@ -557,7 +540,10 @@ export default function DespesaScreen({ navigation, route }) {
                 onValueChange={(itemValue) => setFixedExpenseDueDay(itemValue)}
                 style={commonStyles.picker}
               >
-                {renderDayPickerItems()}
+                {/* INLINE DOS ITENS DO PICKER: Gerando os Picker.Items diretamente aqui */}
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                  <Picker.Item key={String(day)} label={String(day).padStart(2, '0')} value={String(day)} />
+                ))}
               </Picker>
             </View>
           </View>
