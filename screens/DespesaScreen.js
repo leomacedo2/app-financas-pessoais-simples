@@ -32,6 +32,9 @@
  * que retornou após as últimas mudanças no Picker. A correção é feita garantindo
  * que todos os Picker.Items sejam gerados diretamente no JSX para o Picker de Despesa Fixa,
  * e a label do placeholder do Picker de Cartões seja explicitamente uma string.
+ *
+ * CORREÇÃO FINAL: Removido estilo direto do Picker.Item placeholder no seletor de cartões
+ * para evitar interações de renderização inconsistentes em diferentes plataformas.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -495,7 +498,8 @@ export default function DespesaScreen({ navigation, route }) {
                     onValueChange={(itemValue) => setSelectedCardId(itemValue)}
                     style={styles.pickerStyleOverride}
                   >
-                    {selectedCardId === null && <Picker.Item label="Selecione um Cartão" value="" enabled={false} style={{color: '#999'}} />}
+                    {/* Placeholder para o Picker de Cartões, sem estilo direto no Picker.Item */}
+                    {selectedCardId === null && <Picker.Item label="Selecione um Cartão" value="" enabled={false} />}
                     {cards.map(card => (
                       <Picker.Item key={card.id} label={card.alias} value={card.id} />
                     ))}
