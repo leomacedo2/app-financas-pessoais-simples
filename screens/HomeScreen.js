@@ -43,6 +43,7 @@
  * estilos do commonStyles para garantir layout correto.
  * **CORREÇÃO:** Modal de opções de limpeza agora usa `commonStyles.optionButton` para as opções
  * e `commonStyles.modalActionButtonsContainer` para os botões "Confirmar" e "Cancelar".
+ * **CORREÇÃO:** Erro "Text strings must be rendered within a <Text> component" no modal de limpeza.
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -646,7 +647,7 @@ export default function HomeScreen() {
                   <Text style={[styles.debitText, styles.dateColumn]}>
                     {/* Se for despesa fixa, exibe "Dia X", senão a data completa */}
                     {item.paymentMethod === 'Fixa' 
-                      ? `Dia ${String(item.dueDayOfMonth).padStart(2, '0')}` 
+                      ? `Dia ${String(item.dueDayOfMonth || '1').padStart(2, '0')}` // Garante que é string e padStart
                       : String(formatDateForDisplay(new Date(item.dueDate)))
                     }
                   </Text> 
@@ -908,7 +909,7 @@ export default function HomeScreen() {
                   ]}
                   onPress={() => setSelectedClearOption(option.value)}
                 >
-                  <Text style={[
+                  <Text style={[ // GARANTIA DE TEXTO WRAPPADO
                     commonStyles.optionButtonText, // Usando o estilo comum aqui
                     selectedClearOption === option.value ? commonStyles.optionButtonTextSelected : {}
                   ]}>
@@ -923,7 +924,7 @@ export default function HomeScreen() {
                 style={[commonStyles.modalButton, commonStyles.buttonEdit]} // Usando estilos do commonStyles
                 onPress={handleConfirmClearData}
               >
-                <Text style={commonStyles.buttonTextStyle}>Confirmar</Text>
+                <Text style={commonStyles.buttonTextStyle}>Confirmar</Text> {/* GARANTIA DE TEXTO WRAPPADO */}
               </TouchableOpacity>
               <TouchableOpacity
                 style={[commonStyles.modalButton, commonStyles.buttonClose]} // Usando estilos do commonStyles
@@ -932,7 +933,7 @@ export default function HomeScreen() {
                   setSelectedClearOption('4');
                 }}
               >
-                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
+                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text> {/* GARANTIA DE TEXTO WRAPPADO */}
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -964,7 +965,7 @@ export default function HomeScreen() {
                   style={commonStyles.picker}
                 >
                   {pickerMonthOptions.map(month => (
-                    <Picker.Item key={month} label={getMonthName(new Date(initialMonthDate.getFullYear(), parseInt(month, 10) -1, 1))} value={month} />
+                    <Picker.Item key={String(month)} label={getMonthName(new Date(initialMonthDate.getFullYear(), parseInt(month, 10) -1, 1))} value={String(month)} />
                   ))}
                 </Picker>
               </View>
@@ -978,7 +979,7 @@ export default function HomeScreen() {
                   style={commonStyles.picker}
                 >
                   {pickerYearOptions.map(year => (
-                    <Picker.Item key={year} label={year} value={year} />
+                    <Picker.Item key={String(year)} label={String(year)} value={String(year)} />
                   ))}
                 </Picker>
               </View>

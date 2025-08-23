@@ -129,8 +129,8 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
   const renderDayPickerItems = () => {
     const days = [];
     for (let i = 1; i <= 31; i++) {
-      // Adiciona um item para cada dia, formatando com zero à esquerda se for menor que 10
-      days.push(<Picker.Item key={i} label={String(i).padStart(2, '0')} value={String(i)} />);
+      // Garante que tanto label quanto value sejam strings numéricas.
+      days.push(<Picker.Item key={String(i)} label={String(i).padStart(2, '0')} value={String(i)} />);
     }
     return days;
   };
@@ -157,7 +157,6 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
           onValueChange={(itemValue) => setDueDayOfMonth(itemValue)} // Atualiza o estado ao mudar
           style={commonStyles.picker} // Estilo do Picker
         >
-          {/* O primeiro item serve como uma seleção padrão se o valor inicial for '1' ou outro válido */}
           {renderDayPickerItems()} {/* Renderiza os dias de 1 a 31 */}
         </Picker>
       </View>

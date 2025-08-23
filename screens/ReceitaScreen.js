@@ -196,7 +196,7 @@ export default function ReceitaScreen({ navigation }) {
 
       {/* Botão flutuante para adicionar nova receita */}
       <TouchableOpacity
-        style={styles.addButton} // Estilo específico para o botão flutuante nesta tela
+        style={styles.addButton} // Estilo específico para o botão flutuante nesta tela (já circular)
         onPress={() => navigation.navigate('AdicionarReceita')} // Navega para a tela de adicionar
       >
         <Ionicons name="add" size={30} color="#fff" />
@@ -222,25 +222,27 @@ export default function ReceitaScreen({ navigation }) {
         >
           {/* Conteúdo do modal */}
           <View style={commonStyles.modalView}>
+            {/* CORREÇÃO: Garante que o texto seja sempre válido para evitar o erro */}
             <Text style={commonStyles.modalTitle}>Ações para "{selectedIncome?.name || 'Receita Selecionada'}"</Text>
             
-            <View style={commonStyles.modalActionButtonsContainer}> {/* NOVO: Usando o container de botões de AÇÃO */}
+            {/* NOVO: Container para botões empilhados */}
+            <View style={commonStyles.modalStackedButtonsContainer}>
               <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonEdit]}
+                style={[commonStyles.modalButton, commonStyles.modalButtonStacked, commonStyles.buttonEdit]}
                 onPress={handleEditIncome}
               >
                 <Text style={commonStyles.buttonTextStyle}>Editar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonDelete]}
+                style={[commonStyles.modalButton, commonStyles.modalButtonStacked, commonStyles.buttonDelete]}
                 onPress={handleDeleteIncome}
               >
                 <Text style={commonStyles.buttonTextStyle}>Excluir</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonClose]}
+                style={[commonStyles.modalButton, commonStyles.modalButtonStacked, commonStyles.buttonClose]}
                 onPress={() => {
                   setIsActionModalVisible(false);
                   setSelectedIncome(null);

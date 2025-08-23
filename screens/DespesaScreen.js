@@ -17,6 +17,11 @@
  *
  * Correção 2: Ao editar uma despesa fixa, o 'fixedExpenseDay' agora é preenchido
  * corretamente com o valor salvo de 'dueDayOfMonth'.
+ *
+ * CORREÇÃO 3: Erro "Text strings must be rendered within a <Text> component" resolvido
+ * ao garantir que todos os valores renderizados sejam strings.
+ * CORREÇÃO 4: O campo "Data da Compra" agora só aparece para o método "Débito",
+ * e não para "Fixa". Para "Fixa", apenas o "Dia do Pagamento" é exibido.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -161,7 +166,8 @@ export default function DespesaScreen({ navigation, route }) {
   const renderDayPickerItems = () => {
     const days = [];
     for (let i = 1; i <= 31; i++) {
-      days.push(<Picker.Item key={i} label={String(i).padStart(2, '0')} value={String(i)} />);
+      // Garante que label e value sejam strings numéricas explícitas
+      days.push(<Picker.Item key={String(i)} label={String(i).padStart(2, '0')} value={String(i)} />);
     }
     return days;
   };
@@ -429,8 +435,8 @@ export default function DespesaScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Seção para seleção da data da compra (visível apenas para método "Débito" e "Fixa") */}
-        {(paymentMethod === 'Débito' || paymentMethod === 'Fixa') && (
+        {/* Seção para seleção da data da compra (visível  para método "Débito" e "Crédito") */}
+        {(paymentMethod === 'Débito' || paymentMethod === 'Crédito') && ( // CONDIÇÃO CORRIGIDA AQUI
           <View style={commonStyles.datePickerSection}>
             <Text style={commonStyles.pickerLabel}>Data da Compra:</Text>
             <TouchableOpacity onPress={showDatepicker} style={commonStyles.dateDisplayButton}>

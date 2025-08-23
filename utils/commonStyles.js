@@ -6,7 +6,8 @@
  * e facilita a manutenção (mude em um lugar, reflita em todos).
  *
  * Esta versão foi revisada para fornecer estilos de layout de botão mais robustos para modais,
- * diferenciando entre botões de ação (lado a lado) e botões de opção (empilhados, gerenciados pelo componente).
+ * diferenciando entre botões de ação (lado a lado) e botões de opção (empilhados, gerenciados pelo componente),
+ * e adicionando um container para botões de modal empilhados.
  */
 
 import { StyleSheet } from 'react-native';
@@ -107,11 +108,16 @@ const commonStyles = StyleSheet.create({
     fontSize: 16,
     color: '#555',
   },
-  // NOVO: Container para agrupar botões de AÇÃO (editar/excluir/cancelar) lado a lado
+  // Container para agrupar botões de AÇÃO (editar/excluir/cancelar) lado a lado
   modalActionButtonsContainer: {
     flexDirection: 'row', // Alinha os botões lado a lado
     justifyContent: 'space-around', // Espaça uniformemente os botões
     width: '100%',
+    marginTop: 20,
+  },
+  // NOVO: Container para agrupar botões de AÇÃO EMPILHADOS (um embaixo do outro)
+  modalStackedButtonsContainer: {
+    width: '100%', // Ocupa a largura total
     marginTop: 20,
   },
   modalButton: {
@@ -119,10 +125,13 @@ const commonStyles = StyleSheet.create({
     paddingVertical: 12, // Aumenta o padding vertical
     paddingHorizontal: 15, // Padding horizontal
     elevation: 2,
-    flex: 1, // Faz com que os botões ocupem o espaço disponível
-    marginHorizontal: 5, // Espaçamento entre os botões
+    // Remover flex: 1 daqui, pois o containerStackedButtons vai gerenciar a largura
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalButtonStacked: { // Estilo específico para botões empilhados
+    marginBottom: 10, // Espaçamento entre os botões
+    width: '100%', // Ocupa a largura total no container empilhado
   },
   buttonEdit: {
     backgroundColor: '#2196F3', // Azul para editar
@@ -139,7 +148,7 @@ const commonStyles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14, // Ajusta o tamanho da fonte para caber
   },
-  // NOVO: Estilos para botões de OPÇÃO dentro dos modais (como o de limpeza de dados)
+  // Estilos para botões de OPÇÃO dentro dos modais (como o de limpeza de dados)
   optionButton: {
     paddingVertical: 12,
     paddingHorizontal: 15,

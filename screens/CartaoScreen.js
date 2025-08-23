@@ -6,8 +6,9 @@
  * ou excluí-lo (exclusão suave). Suporta rolagem vertical se houver muitos cartões.
  *
  * Correção: Resolvido o erro "Text strings must be rendered within a <Text> component"
- * garantindo que o título do modal sempre tenha um valor de string válido.
- * Utiliza os novos estilos de container de botões do commonStyles para melhor layout.
+ * garantindo que o título do modal e os textos dos botões sempre tenham um valor de string válido.
+ * Os botões do modal de edição agora são empilhados, como solicitado.
+ * O botão de adição flutuante agora é redondo, como em ReceitaScreen.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -196,9 +197,9 @@ export default function CartaoScreen({ navigation }) {
         <Text style={commonStyles.noItemsText}>Nenhum cartão adicionado ainda. Adicione um!</Text>
       )}
 
-      {/* Botão flutuante para adicionar novo cartão */}
+      {/* Botão flutuante para adicionar novo cartão - AGORA COM ESTILO CIRCULAR */}
       <TouchableOpacity
-        style={commonStyles.addButton} // Usa o estilo comum de botão flutuante
+        style={styles.addButton} // Usa o estilo de botão circular desta tela
         onPress={() => navigation.navigate('AdicionarCartao')} // Navega para a tela de adicionar cartão
       >
         <Ionicons name="add" size={30} color="#fff" />
@@ -227,23 +228,24 @@ export default function CartaoScreen({ navigation }) {
             {/* CORREÇÃO: Garante que o texto seja sempre válido para evitar o erro */}
             <Text style={commonStyles.modalTitle}>Ações para "{selectedCard?.alias || 'Cartão Selecionado'}"</Text>
             
-            <View style={commonStyles.modalActionButtonsContainer}> {/* NOVO: Usando o container de botões de AÇÃO */}
+            {/* NOVO: Container para botões empilhados */}
+            <View style={commonStyles.modalStackedButtonsContainer}>
               <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonEdit]}
+                style={[commonStyles.modalButton, commonStyles.modalButtonStacked, commonStyles.buttonEdit]}
                 onPress={handleEditCard}
               >
                 <Text style={commonStyles.buttonTextStyle}>Editar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonDelete]}
+                style={[commonStyles.modalButton, commonStyles.modalButtonStacked, commonStyles.buttonDelete]}
                 onPress={handleDeleteCard}
               >
                 <Text style={commonStyles.buttonTextStyle}>Excluir</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonClose]}
+                style={[commonStyles.modalButton, commonStyles.modalButtonStacked, commonStyles.buttonClose]}
                 onPress={() => {
                   setIsActionModalVisible(false);
                   setSelectedCard(null);
@@ -295,5 +297,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 5,
+  },
+  // Estilo para o botão de adição flutuante (circular)
+  addButton: {
+    ...commonStyles.addButton, // Reutiliza o estilo base do botão
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30, // Transforma em círculo
   },
 });
