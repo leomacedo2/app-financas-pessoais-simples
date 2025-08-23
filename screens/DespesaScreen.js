@@ -48,6 +48,8 @@
  * O `Picker.Item` de placeholder agora é renderizado sempre como o primeiro item,
  * sem a propriedade `enabled={false}`, para evitar erros de "Text strings must be rendered within a <Text> component"
  * que podem surgir de comportamentos inconsistentes do `Picker` com itens desabilitados ou `value`s específicos.
+ *
+ * NOVO DEBUG: Adicionado console.log para inspecionar os Picker.Items do seletor de Dia do Pagamento (Despesa Fixa).
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -560,9 +562,13 @@ export default function DespesaScreen({ navigation, route }) {
                 style={commonStyles.picker}
               >
                 {/* INLINE DOS ITENS DO PICKER: Gerando os Picker.Items diretamente aqui */}
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                  <Picker.Item key={String(day)} label={String(day).padStart(2, '0')} value={String(day)} />
-                ))}
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                  const label = String(day).padStart(2, '0');
+                  const value = String(day);
+                  // NOVO LOG: Imprime os valores que estão sendo passados para cada Picker.Item
+                  console.log(`DespesaScreen: Picker.Item (Dia Fixo): label='${label}', value='${value}'`);
+                  return <Picker.Item key={value} label={label} value={value} />;
+                })}
               </Picker>
             </View>
           </View>

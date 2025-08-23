@@ -3,10 +3,16 @@
 /**
  * @file Arquivo principal do aplicativo, responsável pela configuração da navegação (React Navigation).
  * Define as pilhas de navegação (Stack Navigators) e o navegador de abas (Bottom Tab Navigator).
+ *
+ * CORREÇÃO FINAL PARA WARNING "Text strings must be rendered within a <Text> component":
+ * As `tabBarLabel`s do `Tab.Navigator` foram simplificadas para receberem diretamente uma string.
+ * O React Navigation é projetado para envolver essas strings em `<Text>` internamente,
+ * evitando problemas de renderização que podem ocorrer com o uso de funções anônimas
+ * retornando `<Text>` explicitamente.
  */
 
 import React from 'react';
-import { Text } from 'react-native'; // Importa Text do React Native
+// Removido 'Text' do React Native daqui, pois não será mais usado diretamente no tabBarLabel
 import { NavigationContainer } from '@react-navigation/native'; // Componente principal de navegação
 import { createNativeStackNavigator } from '@react-navigation/native-stack'; // Para navegação em pilha (telas uma sobre a outra)
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'; // Para navegação por abas na parte inferior
@@ -105,22 +111,22 @@ function HomeTabs() {
       <Tab.Screen
         name="Início"
         component={HomeScreen}
-        options={{ tabBarLabel: () => <Text>Início</Text> }} // Label da aba
+        options={{ tabBarLabel: 'Início' }} // SIMPLIFICADO: Apenas a string 'Início'
       />
       <Tab.Screen
         name="ReceitaTab" // Nome da rota para a pilha de receitas
         component={ReceitaNavigator} // Renderiza o ReceitaNavigator (pilha de telas)
-        options={{ tabBarLabel: () => <Text>Receita</Text> }}
+        options={{ tabBarLabel: 'Receita' }} // SIMPLIFICADO: Apenas a string 'Receita'
       />
       <Tab.Screen
         name="Despesa"
         component={DespesaScreen}
-        options={{ tabBarLabel: () => <Text>Despesa</Text> }}
+        options={{ tabBarLabel: 'Despesa' }} // SIMPLIFICADO: Apenas a string 'Despesa'
       />
       <Tab.Screen
         name="CartaoTab" // Nome da rota para a pilha de cartões
         component={CartaoNavigator} // Renderiza o CartaoNavigator (pilha de telas)
-        options={{ tabBarLabel: () => <Text>Cartão</Text> }}
+        options={{ tabBarLabel: 'Cartão' }} // SIMPLIFICADO: Apenas a string 'Cartão'
       />
     </Tab.Navigator>
   );
