@@ -35,6 +35,10 @@
  *
  * CORREÇÃO FINAL: Removido estilo direto do Picker.Item placeholder no seletor de cartões
  * para evitar interações de renderização inconsistentes em diferentes plataformas.
+ *
+ * CORREÇÃO URGENTE: Ajustada a lógica de `selectedCardId` para ser sempre string vazia `''`
+ * em vez de `null` para maior consistência com o `Picker.Item` de placeholder e evitar
+ * o erro "Text strings must be rendered within a <Text> component".
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -95,7 +99,7 @@ export default function DespesaScreen({ navigation, route }) {
   const [paymentMethod, setPaymentMethod] = useState('Débito'); 
   
   const [cards, setCards] = useState([]);
-  const [selectedCardId, setSelectedCardId] = useState(null);
+  const [selectedCardId, setSelectedCardId] = useState(''); // Alterado de null para ''
   const [numInstallments, setNumInstallments] = useState('1');
 
   const [fixedExpenseDueDay, setFixedExpenseDueDay] = useState('1'); 
@@ -128,7 +132,7 @@ export default function DespesaScreen({ navigation, route }) {
           setSelectedCardId(activeCards[0].id);
         }
       } else {
-        setSelectedCardId(null); // Limpa a seleção se não houver cartões ativos
+        setSelectedCardId(''); // Alterado de null para ''
       }
     } catch (error) {
       console.error("DespesaScreen: Erro ao carregar cartões do AsyncStorage:", error);
@@ -153,12 +157,12 @@ export default function DespesaScreen({ navigation, route }) {
         setFixedExpenseDueDay('1');
       } else if (expense.paymentMethod === 'Crédito') {
         setPurchaseDate(new Date(expense.purchaseDate || expense.createdAt));
-        setSelectedCardId(expense.cardId || null);
+        setSelectedCardId(expense.cardId || ''); // Alterado para ''
         setNumInstallments(String(expense.totalInstallments || 1));
         setFixedExpenseDueDay('1');
       } else if (expense.paymentMethod === 'Fixa') {
         setPurchaseDate(new Date()); // Reseta para data atual para não exibir um datepicker sem uso
-        setSelectedCardId(null);
+        setSelectedCardId(''); // Alterado para ''
         setNumInstallments('1');
         setFixedExpenseDueDay(String(expense.dueDayOfMonth || '1'));
       }
@@ -174,7 +178,7 @@ export default function DespesaScreen({ navigation, route }) {
       setExpenseValue('');
       setPurchaseDate(new Date());
       setPaymentMethod('Débito');
-      setSelectedCardId(null);
+      setSelectedCardId(''); // Alterado para ''
       setNumInstallments('1');
       setFixedExpenseDueDay('1');
       setCurrentExpenseStatus('pending');
@@ -367,7 +371,7 @@ export default function DespesaScreen({ navigation, route }) {
       if (cards.length > 0) {
         setSelectedCardId(cards[0].id);
       } else {
-        setSelectedCardId(null);
+        setSelectedCardId(''); // Alterado para ''
       }
       setNumInstallments('1');
       setFixedExpenseDueDay('1');
@@ -499,7 +503,7 @@ export default function DespesaScreen({ navigation, route }) {
                     style={styles.pickerStyleOverride}
                   >
                     {/* Placeholder para o Picker de Cartões, sem estilo direto no Picker.Item */}
-                    {selectedCardId === null && <Picker.Item label="Selecione um Cartão" value="" enabled={false} />}
+                    {selectedCardId === '' && <Picker.Item label="Selecione um Cartão" value="" enabled={false} />} {/* Alterado para '' */}
                     {cards.map(card => (
                       <Picker.Item key={card.id} label={card.alias} value={card.id} />
                     ))}
