@@ -16,14 +16,17 @@
  * ajuste de data de vencimento baseada no dia de vencimento do cartão.
  *
  * CORREÇÕES VISUAIS: Ajuste do layout para campos de crédito (rótulos e input).
- * SINCRONIZAÇÃO DE DADOS: Implementação de useFocusEffect para recarregar cartões
+ * SINCRONIZAÇÃO DE DATAS: Implementação de useFocusEffect para recarregar cartões
  * ao focar na tela, garantindo que as alterações da tela de cartões sejam refletidas.
  *
- * CORREÇÃO ERRO: Encapsulamento de strings de texto dentro de <Text> componentes.
+ * CORREÇÃO ERRO: Encapsulamento de strings de texto dentro de <Text> componentes foi resolvido.
  * CORREÇÃO VISUAL 2: Posicionamento do rótulo "Selecione o Cartão".
  * CORREÇÃO ATUAL: Ajuste na lógica de carregamento e seleção de cartões
  * para garantir que o Picker de cartões apareça corretamente preenchido
  * e não mostre "Nenhum cartão cadastrado" indevidamente.
+ *
+ * ATUALIZAÇÃO RECENTE: O campo "Dia do Pagamento" para despesas do tipo "Fixa" agora é um Picker,
+ * permitindo a seleção de um dia válido (1-31) em vez de um TextInput.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -100,7 +103,9 @@ export default function DespesaScreen({ navigation, route }) {
 
   const [isInstallmentsEditable, setIsInstallmentsEditable] = useState(true);
 
-  // Função para carregar os cartões do AsyncStorage
+  /**
+   * Função para carregar os cartões do AsyncStorage.
+   */
   const loadCards = useCallback(async () => {
     try {
       const storedCardsJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.CARDS);
@@ -120,7 +125,7 @@ export default function DespesaScreen({ navigation, route }) {
     } catch (error) {
       console.error("DespesaScreen: Erro ao carregar cartões do AsyncStorage:", error);
     }
-  }, []); // Dependência vazia para que a função seja criada apenas uma vez.
+  }, [selectedCardId]); // Mantém selectedCardId como dependência para garantir que a pré-seleção funcione ao carregar
 
   useEffect(() => {
     if (route.params?.expenseToEdit) {
@@ -178,7 +183,7 @@ export default function DespesaScreen({ navigation, route }) {
       return () => {
         // Limpeza, se necessário, ao sair do foco
       };
-    }, [loadCards]) // `loadCards` é a dependência, mas como ela não muda, o efeito é estável.
+    }, [loadCards])
   );
 
   const handleDateChange = (event, selectedDate) => {
@@ -190,6 +195,19 @@ export default function DespesaScreen({ navigation, route }) {
 
   const showDatepicker = () => {
     setShowDatePicker(true);
+  };
+
+  /**
+   * Gera os itens <Picker.Item> para o seletor de dia (1 a 31).
+   * @returns {JSX.Element[]} Um array de componentes Picker.Item.
+   */
+  const renderDayPickerItems = () => {
+    const days = [];
+    for (let i = 1; i <= 31; i++) {
+      // Garante que label e value sejam strings numéricas explícitas
+      days.push(<Picker.Item key={String(i)} label={String(i).padStart(2, '0')} value={String(i)} />);
+    }
+    return days;
   };
 
   const handleSaveExpense = async () => {
@@ -218,7 +236,7 @@ export default function DespesaScreen({ navigation, route }) {
     if (paymentMethod === 'Fixa') {
       const day = parseInt(fixedExpenseDueDay, 10);
       if (isNaN(day) || day < 1 || day > 31) {
-        Alert.alert('Erro', 'Para despesas fixas, por favor, insira um dia de pagamento válido (entre 1 e 31).');
+        Alert.alert('Erro', 'Para despesas fixas, por favor, selecione um dia de pagamento válido (entre 1 e 31).');
         return;
       }
     }
@@ -526,18 +544,19 @@ export default function DespesaScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Campo para o Dia do Pagamento (visível apenas para método "Fixa") */}
+        {/* Campo para o Dia do Pagamento (visível apenas para método "Fixa") - AGORA É UM PICKER */}
         {paymentMethod === 'Fixa' && (
           <View style={styles.fixedExpenseDayContainer}>
             <Text style={commonStyles.pickerLabel}>Dia do Pagamento (1-31):</Text>
-            <TextInput
-              style={commonStyles.input}
-              placeholder="Ex: 5, 10, 20"
-              keyboardType="numeric"
-              value={fixedExpenseDueDay}
-              onChangeText={(text) => setFixedExpenseDueDay(text.replace(/[^0-9]/g, ''))}
-              maxLength={2}
-            />
+            <View style={commonStyles.pickerContainer}> {/* Reutiliza o estilo de container do picker */}
+              <Picker
+                selectedValue={fixedExpenseDueDay}
+                onValueChange={(itemValue) => setFixedExpenseDueDay(itemValue)}
+                style={commonStyles.picker}
+              >
+                {renderDayPickerItems()}
+              </Picker>
+            </View>
           </View>
         )}
 
@@ -602,14 +621,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Novo estilo para sobrescrever o picker seletor, se necessário
   pickerStyleOverride: {
     height: 50,
     width: '100%',
-    // Aqui você pode adicionar estilos adicionais para forçar o texto do Picker a se comportar
-    // Por exemplo, background: 'transparent' ou um padding interno.
-    // O React Native Picker às vezes tem uma área de toque interna que pode ser confundida.
-    // Vamos começar sem muitos estilos extras aqui, pois commonStyles.picker já aplica o básico.
-    // O problema pode estar mais no container ou no Text do rótulo.
   },
 });
