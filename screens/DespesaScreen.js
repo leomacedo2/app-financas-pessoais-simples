@@ -39,6 +39,10 @@
  * CORREÇÃO URGENTE: Ajustada a lógica de `selectedCardId` para ser sempre string vazia `''`
  * em vez de `null` para maior consistência com o `Picker.Item` de placeholder e evitar
  * o erro "Text strings must be rendered within a <Text> component".
+ *
+ * DEBUG E CORREÇÃO "UNDEFINED": Adicionado `console.log` para inspecionar os cartões carregados.
+ * A propriedade `label` dos `Picker.Item`s de cartão agora usa `String(card.alias || '')`
+ * para garantir que nunca seja `undefined` ou `null`, resolvendo o erro e a exibição de "undefined".
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -124,6 +128,8 @@ export default function DespesaScreen({ navigation, route }) {
       const storedCards = storedCardsJson ? JSON.parse(storedCardsJson) : [];
       const activeCards = storedCards.filter(card => card.status !== 'inactive');
       setCards(activeCards);
+      
+      console.log("DespesaScreen: Cartões ativos carregados:", activeCards.map(c => ({id: c.id, alias: c.alias, dueDayOfMonth: c.dueDayOfMonth})));
 
       if (activeCards.length > 0) {
         // Se já houver um cartão selecionado e ele ainda estiver ativo, mantém.
@@ -503,9 +509,9 @@ export default function DespesaScreen({ navigation, route }) {
                     style={styles.pickerStyleOverride}
                   >
                     {/* Placeholder para o Picker de Cartões, sem estilo direto no Picker.Item */}
-                    {selectedCardId === '' && <Picker.Item label="Selecione um Cartão" value="" enabled={false} />} {/* Alterado para '' */}
+                    {selectedCardId === '' && <Picker.Item label="Selecione um Cartão" value="" enabled={false} />}
                     {cards.map(card => (
-                      <Picker.Item key={card.id} label={card.alias} value={card.id} />
+                      <Picker.Item key={card.id} label={String(card.alias || '')} value={card.id} />
                     ))}
                   </Picker>
                 </View>
