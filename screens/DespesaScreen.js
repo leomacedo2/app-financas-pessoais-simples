@@ -20,7 +20,7 @@
  *
  * CORREÇÃO 3: Erro "Text strings must be rendered within a <Text> component" resolvido
  * ao garantir que todos os valores renderizados sejam strings.
- * CORREÇÃO 4: O campo "Data da Compra" agora só aparece para o método "Débito",
+ * CORREÇÃO 4: O campo "Data da Compra" agora só aparece para o método "Débito" e "Crédito",
  * e não para "Fixa". Para "Fixa", apenas o "Dia do Pagamento" é exibido.
  */
 
