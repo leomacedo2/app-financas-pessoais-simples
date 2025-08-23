@@ -35,6 +35,14 @@
  * o mês ao qual o ganho se refere) em vez de `income.createdAt` (data de criação do registro).
  * Isso garante que apenas as receitas de 'Ganho' que realmente *pertencem* ao mês
  * selecionado para limpeza sejam marcadas como inativas.
+ * 6. **NOVO: Suporte a `dueDayOfMonth` para despesas `Fixa`**: A função `getExpensesForMonth`
+ * foi atualizada para considerar o `dueDayOfMonth` para despesas do tipo `Fixa`,
+ * garantindo que a data de vencimento seja corretamente exibida e filtrada.
+ *
+ * **CORREÇÃO:** Botões de "Limpar Dados" e "Gerar Despesas Aleatórias" no topo agora usam
+ * estilos do commonStyles para garantir layout correto.
+ * **CORREÇÃO:** Modal de opções de limpeza agora usa `commonStyles.optionButton` para as opções
+ * e `commonStyles.modalActionButtonsContainer` para os botões "Confirmar" e "Cancelar".
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -264,7 +272,7 @@ export default function HomeScreen() {
           
           expensesForThisMonth.push({
             ...item,
-            dueDate: fixedDueDate.toISOString(),
+            dueDate: fixedDueDate.toISOString(), // Usa o dueDate calculado para despesas fixas
             id: `${item.id}-${targetYear}-${targetMonth}`,
             description: `${item.description} (Fixo)` 
           });
@@ -635,7 +643,13 @@ export default function HomeScreen() {
               {expenses.map((item) => (
                 <View key={String(item.id)} style={styles.debitItemRow}>
                   <Text style={[styles.debitText, styles.descriptionColumn]}>{String(item.description)}</Text>
-                  <Text style={[styles.debitText, styles.dateColumn]}>{String(formatDateForDisplay(new Date(item.dueDate)))}</Text> 
+                  <Text style={[styles.debitText, styles.dateColumn]}>
+                    {/* Se for despesa fixa, exibe "Dia X", senão a data completa */}
+                    {item.paymentMethod === 'Fixa' 
+                      ? `Dia ${String(item.dueDayOfMonth).padStart(2, '0')}` 
+                      : String(formatDateForDisplay(new Date(item.dueDate)))
+                    }
+                  </Text> 
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
                   </Text>
@@ -772,7 +786,6 @@ export default function HomeScreen() {
         }
         return expense;
       });
-      // Correção: ASYNC_STORAGE_KEYS (erro de digitação)
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses));
 
       Alert.alert('Sucesso', `Dados do mês ${getMonthName(targetDateToClear)}/${yearToClear} marcados como inativos.`);
@@ -835,7 +848,7 @@ export default function HomeScreen() {
         onMomentumScrollEnd={handleScroll} // Chama a função ao final da rolagem
         initialScrollIndex={currentMonthIndex} // Usa o índice já calculado para a rolagem inicial
         extraData={currentMonthIndex} // Garante re-renderização quando o mês atual muda (para o resumo)
-        // Otimização para listas longas: informa à FlatList o tamanho de cada item para otimizar a renderização
+        // Otimização para listas longas: informa à FlatList o tamanho de cada item para otimiza a renderização
         getItemLayout={(data, index) => ({
           length: width, // Cada item tem a largura total da tela
           offset: width * index, // O deslocamento é a largura vezes o índice
@@ -885,7 +898,7 @@ export default function HomeScreen() {
           <Pressable style={[commonStyles.modalView, { zIndex: 100 }]} onPress={(e) => e.stopPropagation()}>
             <Text style={commonStyles.modalTitle}>Opções de Limpeza de Dados</Text>
 
-            <View style={styles.clearOptionsContainer}>
+            <View style={styles.clearOptionsContainer}> {/* Este container gerencia o layout vertical */}
               {clearOptions.map((option) => (
                 <TouchableOpacity
                   key={option.value}
@@ -905,7 +918,7 @@ export default function HomeScreen() {
               ))}
             </View>
 
-            <View style={styles.modalButtonContainer}>
+            <View style={commonStyles.modalActionButtonsContainer}> {/* Usando o novo container de AÇÕES (lado a lado) */}
               <TouchableOpacity
                 style={[commonStyles.modalButton, commonStyles.buttonEdit]} // Usando estilos do commonStyles
                 onPress={handleConfirmClearData}
@@ -931,7 +944,7 @@ export default function HomeScreen() {
         animationType="slide"
         transparent={true}
         visible={isMonthYearPickerVisible}
-        onRequestClose={() => setIsMonthYearYearPickerVisible(false)} // Corrigido para setIsMonthYearYearPickerVisible
+        onRequestClose={() => setIsMonthYearYearPickerVisible(false)}
       >
         <Pressable
           style={commonStyles.centeredView}
@@ -941,9 +954,9 @@ export default function HomeScreen() {
             <Text style={commonStyles.modalTitle}>Limpar Dados de Mês Específico</Text>
             <Text style={commonStyles.modalText}>Selecione o mês e ano para exclusão suave:</Text>
 
-            <View style={styles.pickerWrapper}>
+            <View style={commonStyles.pickerWrapper}>
               {/* Picker para Mês */}
-              <View style={styles.halfPickerContainer}>
+              <View style={commonStyles.halfPickerContainer}>
                 <Text style={commonStyles.pickerLabel}>Mês:</Text>
                 <Picker
                   selectedValue={pickerMonth}
@@ -957,7 +970,7 @@ export default function HomeScreen() {
               </View>
 
               {/* Picker para Ano */}
-              <View style={styles.halfPickerContainer}>
+              <View style={commonStyles.halfPickerContainer}>
                 <Text style={commonStyles.pickerLabel}>Ano:</Text>
                 <Picker
                   selectedValue={pickerYear}
@@ -971,7 +984,7 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <View style={styles.modalButtonContainer}>
+            <View style={commonStyles.modalActionButtonsContainer}> {/* Usando o novo container de AÇÕES (lado a lado) */}
               <TouchableOpacity
                 style={[commonStyles.modalButton, commonStyles.buttonEdit]}
                 onPress={performMonthYearClear}
@@ -1010,8 +1023,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 8,
-    flex: 1,
-    marginRight: 10,
+    flex: 1, // Faz o botão ocupar o espaço disponível
+    marginRight: 10, // Espaçamento entre os botões
     alignItems: 'center',
   },
   clearDataButtonText: {
@@ -1024,7 +1037,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 8,
-    flex: 1,
+    flex: 1, // Faz o botão ocupar o espaço disponível
     alignItems: 'center',
   },
   generateRandomButtonText: {
@@ -1151,25 +1164,5 @@ const styles = StyleSheet.create({
   clearOptionsContainer: {
     width: '100%',
     marginBottom: 20,
-  },
-  modalButtonContainer: {
-    flexDirection: 'row',
-    marginTop: 20,
-    justifyContent: 'space-around',
-    width: '100%',
-  },
-  pickerWrapper: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginBottom: 20,
-  },
-  halfPickerContainer: {
-    flex: 1,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    marginHorizontal: 5,
   },
 });

@@ -4,6 +4,10 @@
  * @file Tela para exibir e gerenciar os cartões cadastrados.
  * Permite ao usuário visualizar seus cartões, editar detalhes de um cartão
  * ou excluí-lo (exclusão suave). Suporta rolagem vertical se houver muitos cartões.
+ *
+ * Correção: Resolvido o erro "Text strings must be rendered within a <Text> component"
+ * garantindo que o título do modal sempre tenha um valor de string válido.
+ * Utiliza os novos estilos de container de botões do commonStyles para melhor layout.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -46,7 +50,7 @@ export default function CartaoScreen({ navigation }) {
       const sortedCards = activeCards.sort((a, b) => a.alias.localeCompare(b.alias));
 
       setCards(sortedCards); // Atualiza o estado com os cartões filtrados e ordenados
-      console.log("Cartões carregados (ativos) do AsyncStorage. Total:", sortedCards.length);
+      console.log("Cartões carregados (ativas) do AsyncStorage. Total:", sortedCards.length);
     } catch (error) {
       console.error("Erro ao carregar cartões do AsyncStorage:", error);
       Alert.alert('Erro', 'Não foi possível carregar seus cartões.');
@@ -220,31 +224,34 @@ export default function CartaoScreen({ navigation }) {
         >
           {/* Conteúdo do modal */}
           <View style={commonStyles.modalView}>
-            <Text style={commonStyles.modalTitle}>Ações para "{selectedCard?.alias}"</Text>
+            {/* CORREÇÃO: Garante que o texto seja sempre válido para evitar o erro */}
+            <Text style={commonStyles.modalTitle}>Ações para "{selectedCard?.alias || 'Cartão Selecionado'}"</Text>
             
-            <TouchableOpacity
-              style={[commonStyles.modalButton, commonStyles.buttonEdit]}
-              onPress={handleEditCard}
-            >
-              <Text style={commonStyles.buttonTextStyle}>Editar</Text>
-            </TouchableOpacity>
+            <View style={commonStyles.modalActionButtonsContainer}> {/* NOVO: Usando o container de botões de AÇÃO */}
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonEdit]}
+                onPress={handleEditCard}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Editar</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[commonStyles.modalButton, commonStyles.buttonDelete]}
-              onPress={handleDeleteCard}
-            >
-              <Text style={commonStyles.buttonTextStyle}>Excluir</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonDelete]}
+                onPress={handleDeleteCard}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Excluir</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[commonStyles.modalButton, commonStyles.buttonClose]}
-              onPress={() => {
-                setIsActionModalVisible(false);
-                setSelectedCard(null);
-              }}
-            >
-              <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonClose]}
+                onPress={() => {
+                  setIsActionModalVisible(false);
+                  setSelectedCard(null);
+                }}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -256,13 +263,7 @@ const styles = StyleSheet.create({
   container: {
     ...commonStyles.container, // Herda o estilo base
     paddingHorizontal: 20, // Padding lateral específico para a lista de cartões
-    // Não precisa de flex: 1 aqui, pois commonStyles.container já define.
   },
-  // O título já está com estilo em commonStyles.title, mas você pode sobrescrever se precisar de algo específico
-  // title: {
-  //   ...commonStyles.title,
-  //   marginBottom: 20,
-  // },
   listContent: {
     paddingBottom: 80, // Espaço para o botão de adição flutuante na parte inferior
   },
@@ -295,6 +296,4 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
   },
-  // O 'addButton' já vêm de commonStyles.
-  // Você pode sobrescrever aqui se precisar de um estilo muito específico.
 });

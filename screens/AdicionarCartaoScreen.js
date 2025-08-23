@@ -14,7 +14,7 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
   const insets = useSafeAreaInsets(); // Obtém os insets da área segura (ex: altura da barra de status)
 
   const [cardAlias, setCardAlias] = useState(''); // Estado para o apelido do cartão
-  const [dueDayOfMonth, setDueDayOfMonth] = useState('1'); // Estado para o dia de vencimento (string para o Picker)
+  const [dueDayOfMonth, setDueDayOfMonth] = useState('1'); // Estado inicial como '1' para evitar 'undefined' no Picker
   const [savingCard, setSavingCard] = useState(false); // Estado para controlar o salvamento do cartão (mostra ActivityIndicator)
 
   const [isEditing, setIsEditing] = useState(false); // Indica se a tela está em modo de edição
@@ -38,7 +38,7 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
       setIsEditing(false); // Modo de adição
       setCurrentCardId(null);
       setCardAlias('');
-      setDueDayOfMonth('1'); // Reinicia para o dia 1 para nova adição
+      setDueDayOfMonth('1'); // Reinicia para o dia '1' para nova adição
       setCurrentCardStatus('active'); // Novo cartão é sempre ativo por padrão
     }
   }, [route.params?.cardToEdit]); // Roda sempre que os parâmetros de rota mudam
@@ -52,6 +52,12 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
       Alert.alert('Erro', 'Por favor, insira um apelido para o cartão.');
       return;
     }
+    // Validação para o dia de vencimento - deve ser um número entre 1 e 31
+    const day = parseInt(dueDayOfMonth, 10);
+    if (isNaN(day) || day < 1 || day > 31) {
+      Alert.alert('Erro', 'Por favor, selecione um dia de vencimento válido (entre 1 e 31).');
+      return;
+    }
 
     setSavingCard(true); // Ativa o estado de salvamento (mostra ActivityIndicator)
 
@@ -63,24 +69,20 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
       // Prepara os dados do cartão a ser salvo/atualizado
       let cardData = {
         alias: cardAlias.trim(),
-        dueDayOfMonth: parseInt(dueDayOfMonth, 10), // Converte o dia para número inteiro
+        dueDayOfMonth: day, // Usa o dia validado numericamente
         status: currentCardStatus, // Mantém o status atual (útil para edição de cartões inativos)
       };
 
       if (isEditing && currentCardId) {
         // --- Lógica para EDIÇÃO de Cartão ---
         cardData.id = currentCardId; // Mantém o mesmo ID para atualização
-        // Preserva a data de criação original se estiver editando
-        cardData.createdAt = route.params.cardToEdit.createdAt; 
-        // Preserva a data de exclusão suave se estiver editando e já havia sido excluído
-        cardData.deletedAt = route.params.cardToEdit.deletedAt || null;
+        cardData.createdAt = route.params.cardToEdit.createdAt; // Preserva a data de criação original
+        cardData.deletedAt = route.params.cardToEdit.deletedAt || null; // Preserva a data de exclusão suave
 
-        // Encontra o índice do cartão a ser editado no array
         const index = cards.findIndex(c => c.id === currentCardId);
         if (index !== -1) {
           cards[index] = cardData; // Atualiza o item no array
         } else {
-          // Caso o cartão a ser editado não seja encontrado (situação improvável, mas para segurança)
           console.warn("Cartão a ser editado não encontrado. Adicionando como novo.");
           cards.push({ ...cardData, id: Date.now().toString(), createdAt: new Date().toISOString() });
         }
@@ -102,7 +104,7 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
 
       // Limpa o formulário após o sucesso do salvamento/atualização
       setCardAlias('');
-      setDueDayOfMonth('1');
+      setDueDayOfMonth('1'); // Reinicia para '1'
       setIsEditing(false);
       setCurrentCardId(null);
       setCurrentCardStatus('active');
@@ -155,6 +157,7 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
           onValueChange={(itemValue) => setDueDayOfMonth(itemValue)} // Atualiza o estado ao mudar
           style={commonStyles.picker} // Estilo do Picker
         >
+          {/* O primeiro item serve como uma seleção padrão se o valor inicial for '1' ou outro válido */}
           {renderDayPickerItems()} {/* Renderiza os dias de 1 a 31 */}
         </Picker>
       </View>
