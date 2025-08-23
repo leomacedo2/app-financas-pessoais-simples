@@ -40,8 +40,7 @@
  * em vez de `null` para maior consistência com o `Picker.Item` de placeholder e evitar
  * o erro "Text strings must be rendered within a <Text> component".
  *
- * DEBUG E CORREÇÃO "UNDEFINED": Adicionado `console.log` para inspecionar os cartões carregados.
- * A propriedade `label` dos `Picker.Item`s de cartão agora usa `String(card.alias || '')`
+ * DEBUG E CORREÇÃO "UNDEFINED": A propriedade `label` dos `Picker.Item`s de cartão agora usa `String(card.alias || '')`
  * para garantir que nunca seja `undefined` ou `null`, resolvendo o erro e a exibição de "undefined".
  *
  * CORREÇÃO CRÍTICA DO PICKER: Refatorado o placeholder do seletor de cartões.
@@ -49,7 +48,8 @@
  * sem a propriedade `enabled={false}`, para evitar erros de "Text strings must be rendered within a <Text> component"
  * que podem surgir de comportamentos inconsistentes do `Picker` com itens desabilitados ou `value`s específicos.
  *
- * NOVO DEBUG: Adicionado console.log para inspecionar os Picker.Items do seletor de Dia do Pagamento (Despesa Fixa).
+ * REVERSÃO DO PICKER DE DIA FIXO: O `@react-native-picker/picker` para o "Dia do Pagamento (1-31)"
+ * e o modal customizado foram removidos. O campo de seleção de dia voltou a ser um TextInput simples.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -57,12 +57,14 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, A
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Picker } from '@react-native-picker/picker';
-import { useFocusEffect } from '@react-navigation/native';
+import { Picker } from '@react-native-picker/picker'; // Mantido para o picker de cartões
 
 // Importa os estilos comuns e as chaves de armazenamento como constantes para reutilização
 import commonStyles from '../utils/commonStyles';
 import { ASYNC_STORAGE_KEYS } from '../utils/constants';
+
+// Importa useFocusEffect
+import { useFocusEffect } from '@react-navigation/native'; 
 
 /**
  * Função auxiliar para calcular a primeira data de vencimento de uma compra de crédito,
@@ -110,10 +112,13 @@ export default function DespesaScreen({ navigation, route }) {
   const [paymentMethod, setPaymentMethod] = useState('Débito'); 
   
   const [cards, setCards] = useState([]);
-  const [selectedCardId, setSelectedCardId] = useState(''); // Alterado de null para ''
+  const [selectedCardId, setSelectedCardId] = useState(''); 
   const [numInstallments, setNumInstallments] = useState('1');
 
+  // Estado para o dia de vencimento de despesas fixas
   const [fixedExpenseDueDay, setFixedExpenseDueDay] = useState('1'); 
+  // Removido estado para visibilidade do modal de seleção de dia fixo
+  // const [isFixedDayModalVisible, setIsFixedDayModalVisible] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
   const [savingExpense, setSavingExpense] = useState(false);
@@ -139,18 +144,16 @@ export default function DespesaScreen({ navigation, route }) {
       console.log("DespesaScreen: Cartões ativos carregados:", activeCards.map(c => ({id: c.id, alias: c.alias, dueDayOfMonth: c.dueDayOfMonth})));
 
       if (activeCards.length > 0) {
-        // Se já houver um cartão selecionado e ele ainda estiver ativo, mantém.
-        // Caso contrário, seleciona o primeiro cartão ativo (ou o placeholder '' se não houver um padrão).
         if (!selectedCardId || !activeCards.some(card => card.id === selectedCardId)) {
           setSelectedCardId(activeCards[0].id);
         }
       } else {
-        setSelectedCardId(''); // Se não houver cartões, define para o placeholder
+        setSelectedCardId(''); 
       }
     } catch (error) {
       console.error("DespesaScreen: Erro ao carregar cartões do AsyncStorage:", error);
     }
-  }, [selectedCardId]); // Mantém selectedCardId como dependência para garantir que a pré-seleção funcione ao carregar
+  }, [selectedCardId]); 
 
   useEffect(() => {
     if (route.params?.expenseToEdit) {
@@ -162,7 +165,6 @@ export default function DespesaScreen({ navigation, route }) {
 
       setPaymentMethod(expense.paymentMethod || 'Débito');
 
-      // Desabilita a edição de parcelas se for uma despesa de crédito parcelada
       setIsInstallmentsEditable(!(expense.paymentMethod === 'Crédito' && expense.totalInstallments > 1));
 
       if (expense.paymentMethod === 'Débito') {
@@ -170,12 +172,12 @@ export default function DespesaScreen({ navigation, route }) {
         setFixedExpenseDueDay('1');
       } else if (expense.paymentMethod === 'Crédito') {
         setPurchaseDate(new Date(expense.purchaseDate || expense.createdAt));
-        setSelectedCardId(expense.cardId || ''); // Alterado para ''
+        setSelectedCardId(expense.cardId || ''); 
         setNumInstallments(String(expense.totalInstallments || 1));
         setFixedExpenseDueDay('1');
       } else if (expense.paymentMethod === 'Fixa') {
-        setPurchaseDate(new Date()); // Reseta para data atual para não exibir um datepicker sem uso
-        setSelectedCardId(''); // Alterado para ''
+        setPurchaseDate(new Date()); 
+        setSelectedCardId(''); 
         setNumInstallments('1');
         setFixedExpenseDueDay(String(expense.dueDayOfMonth || '1'));
       }
@@ -191,13 +193,13 @@ export default function DespesaScreen({ navigation, route }) {
       setExpenseValue('');
       setPurchaseDate(new Date());
       setPaymentMethod('Débito');
-      setSelectedCardId(''); // Alterado para ''
+      setSelectedCardId(''); 
       setNumInstallments('1');
       setFixedExpenseDueDay('1');
       setCurrentExpenseStatus('pending');
       setCurrentExpensePaidAt(null);
       setCurrentExpenseDeletedAt(null);
-      setIsInstallmentsEditable(true); // Habilita a edição para novas despesas
+      setIsInstallmentsEditable(true); 
     }
   }, [route.params?.expenseToEdit]);
 
@@ -384,7 +386,7 @@ export default function DespesaScreen({ navigation, route }) {
       if (cards.length > 0) {
         setSelectedCardId(cards[0].id);
       } else {
-        setSelectedCardId(''); // Alterado para ''
+        setSelectedCardId(''); 
       }
       setNumInstallments('1');
       setFixedExpenseDueDay('1');
@@ -406,6 +408,19 @@ export default function DespesaScreen({ navigation, route }) {
       setSavingExpense(false);
     }
   };
+
+  // Removido renderDayItem
+  // const renderDayItem = ({ item }) => (
+  //   <TouchableOpacity
+  //     style={styles.dayItem}
+  //     onPress={() => {
+  //       setFixedExpenseDueDay(String(item));
+  //       setIsFixedDayModalVisible(false);
+  //     }}
+  //   >
+  //     <Text style={styles.dayItemText}>{String(item).padStart(2, '0')}</Text>
+  //   </TouchableOpacity>
+  // );
 
   return (
     <View style={[commonStyles.container, { paddingTop: insets.top }]}>
@@ -507,13 +522,13 @@ export default function DespesaScreen({ navigation, route }) {
           <View style={styles.creditOptionsContainer}>
             {cards.length > 0 ? (
               <>
-                {/* Seletor de Cartões */}
+                {/* Seletor de Cartões (mantém o Picker nativo aqui) */}
                 <View style={commonStyles.pickerContainer}>
                   <Text style={commonStyles.pickerLabel}>Selecione o Cartão:</Text>
                   <Picker
                     selectedValue={selectedCardId}
                     onValueChange={(itemValue) => setSelectedCardId(itemValue)}
-                    style={styles.pickerStyleOverride}
+                    style={commonStyles.picker}
                   >
                     {/* Placeholder sempre como o primeiro item, com value="" */}
                     <Picker.Item label="Selecione um Cartão" value="" />
@@ -551,26 +566,18 @@ export default function DespesaScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Campo para o Dia do Pagamento (visível apenas para método "Fixa") - AGORA É UM PICKER */}
+        {/* Campo para o Dia do Pagamento (visível apenas para método "Fixa") - VOLTA A SER UM TEXTINPUT */}
         {paymentMethod === 'Fixa' && (
           <View style={styles.fixedExpenseDayContainer}>
             <Text style={commonStyles.pickerLabel}>Dia do Pagamento (1-31):</Text>
-            <View style={commonStyles.pickerContainer}> {/* Reutiliza o estilo de container do picker */}
-              <Picker
-                selectedValue={fixedExpenseDueDay}
-                onValueChange={(itemValue) => setFixedExpenseDueDay(itemValue)}
-                style={commonStyles.picker}
-              >
-                {/* INLINE DOS ITENS DO PICKER: Gerando os Picker.Items diretamente aqui */}
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                  const label = String(day).padStart(2, '0');
-                  const value = String(day);
-                  // NOVO LOG: Imprime os valores que estão sendo passados para cada Picker.Item
-                  console.log(`DespesaScreen: Picker.Item (Dia Fixo): label='${label}', value='${value}'`);
-                  return <Picker.Item key={value} label={label} value={value} />;
-                })}
-              </Picker>
-            </View>
+            <TextInput
+              style={commonStyles.input}
+              placeholder="Ex: 5, 10, 20"
+              keyboardType="numeric"
+              value={fixedExpenseDueDay}
+              onChangeText={(text) => setFixedExpenseDueDay(text.replace(/[^0-9]/g, ''))}
+              maxLength={2} // Limita a 2 dígitos
+            />
           </View>
         )}
 
@@ -587,6 +594,9 @@ export default function DespesaScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Removido o Modal para seleção do Dia do Pagamento Fixo */}
+      {/* <Modal ...> ... </Modal> */}
     </View>
   );
 }
@@ -639,4 +649,10 @@ const styles = StyleSheet.create({
     height: 50,
     width: '100%',
   },
+  // Removidos estilos relacionados ao Modal de seleção de dia fixo
+  // modalContent: { ... },
+  // modalPickerTitle: { ... },
+  // daysListContainer: { ... },
+  // dayItem: { ... },
+  // dayItemText: { ... },
 });
