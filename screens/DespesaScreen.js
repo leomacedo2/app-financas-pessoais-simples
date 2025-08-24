@@ -55,6 +55,10 @@
  * foi revista e aprimorada para garantir que o dia de vencimento seja corretamente ajustado
  * para o último dia do mês quando o dia configurado (ex: 31) não existir no mês em questão.
  * Isso resolve os problemas de parcelas "saltando" para o próximo mês ou exibindo datas erradas.
+ *
+ * ATUALIZAÇÃO 23/08/2025: Reintrodução do Picker para "Dia do Pagamento" em despesas fixas,
+ * sem comentários JSX diretos para testar a correção do erro anterior.
+ * CORREÇÃO 23/08/2025: Corrigido o erro de `useState` para `currentExpenseDeletedAt`.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -62,14 +66,14 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, A
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Picker } from '@react-native-picker/picker'; // Mantido para o picker de cartões
+import { Picker } from '@react-native-picker/picker';
 
 // Importa os estilos comuns e as chaves de armazenamento como constantes para reutilização
 import commonStyles from '../utils/commonStyles';
 import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 
 // Importa useFocusEffect
-import { useFocusEffect } from '@react-navigation/native'; 
+import { useFocusEffect } from '@react-navigation/native';
 
 /**
  * Função auxiliar para obter o último dia de um determinado mês e ano.
@@ -149,14 +153,14 @@ export default function DespesaScreen({ navigation, route }) {
   const [expenseName, setExpenseName] = useState('');
   const [expenseValue, setExpenseValue] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date());
-  const [paymentMethod, setPaymentMethod] = useState('Débito'); 
+  const [paymentMethod, setPaymentMethod] = useState('Débito');
   
   const [cards, setCards] = useState([]);
-  const [selectedCardId, setSelectedCardId] = useState(''); 
+  const [selectedCardId, setSelectedCardId] = useState('');
   const [numInstallments, setNumInstallments] = useState('1');
 
   // Estado para o dia de vencimento de despesas fixas
-  const [fixedExpenseDueDay, setFixedExpenseDueDay] = useState('1'); 
+  const [fixedExpenseDueDay, setFixedExpenseDueDay] = useState('1');
 
   const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
   const [savingExpense, setSavingExpense] = useState(false);
@@ -165,13 +169,11 @@ export default function DespesaScreen({ navigation, route }) {
   const [currentExpenseId, setCurrentExpenseId] = useState(null);
   const [currentExpenseStatus, setCurrentExpenseStatus] = useState(null);
   const [currentExpensePaidAt, setCurrentExpensePaidAt] = useState(null);
+  // CORREÇÃO: Inicialização correta de useState
   const [currentExpenseDeletedAt, setCurrentExpenseDeletedAt] = useState(null);
 
   const [isInstallmentsEditable, setIsInstallmentsEditable] = useState(true);
 
-  /**
-   * Função para carregar os cartões do AsyncStorage.
-   */
   const loadCards = useCallback(async () => {
     try {
       const storedCardsJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.CARDS);
@@ -186,12 +188,12 @@ export default function DespesaScreen({ navigation, route }) {
           setSelectedCardId(activeCards[0].id);
         }
       } else {
-        setSelectedCardId(''); 
+        setSelectedCardId('');
       }
     } catch (error) {
       console.error("DespesaScreen: Erro ao carregar cartões do AsyncStorage:", error);
     }
-  }, [selectedCardId]); 
+  }, [selectedCardId]);
 
   useEffect(() => {
     if (route.params?.expenseToEdit) {
@@ -210,12 +212,12 @@ export default function DespesaScreen({ navigation, route }) {
         setFixedExpenseDueDay('1');
       } else if (expense.paymentMethod === 'Crédito') {
         setPurchaseDate(new Date(expense.purchaseDate || expense.createdAt));
-        setSelectedCardId(expense.cardId || ''); 
+        setSelectedCardId(expense.cardId || '');
         setNumInstallments(String(expense.totalInstallments || 1));
         setFixedExpenseDueDay('1');
       } else if (expense.paymentMethod === 'Fixa') {
-        setPurchaseDate(new Date()); 
-        setSelectedCardId(''); 
+        setPurchaseDate(new Date());
+        setSelectedCardId('');
         setNumInstallments('1');
         setFixedExpenseDueDay(String(expense.dueDayOfMonth || '1'));
       }
@@ -231,22 +233,20 @@ export default function DespesaScreen({ navigation, route }) {
       setExpenseValue('');
       setPurchaseDate(new Date());
       setPaymentMethod('Débito');
-      setSelectedCardId(''); 
+      setSelectedCardId('');
       setNumInstallments('1');
       setFixedExpenseDueDay('1');
       setCurrentExpenseStatus('pending');
       setCurrentExpensePaidAt(null);
       setCurrentExpenseDeletedAt(null);
-      setIsInstallmentsEditable(true); 
+      setIsInstallmentsEditable(true);
     }
   }, [route.params?.expenseToEdit]);
 
-  // Use useFocusEffect para recarregar cartões sempre que a tela for focada
   useFocusEffect(
     useCallback(() => {
       loadCards();
       return () => {
-        // Limpeza, se necessário, ao sair do foco
       };
     }, [loadCards])
   );
@@ -327,10 +327,9 @@ export default function DespesaScreen({ navigation, route }) {
           updatedExpense.installmentNumber = route.params.expenseToEdit.installmentNumber || 1;
           updatedExpense.totalInstallments = route.params.expenseToEdit.totalInstallments || parseInt(numInstallments, 10);
           updatedExpense.originalExpenseId = route.params.expenseToEdit.originalExpenseId || currentExpenseId;
-          updatedExpense.dueDate = route.params.expenseToEdit.dueDate; 
+          updatedExpense.dueDate = route.params.expenseToEdit.dueDate;
           delete updatedExpense.dueDayOfMonth;
         } else if (paymentMethod === 'Fixa') {
-          // Garante que o fixedExpenseDueDay seja ajustado para o último dia do mês se necessário
           let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
           const currentMonth = new Date().getMonth();
           const currentYear = new Date().getFullYear();
@@ -402,14 +401,13 @@ export default function DespesaScreen({ navigation, route }) {
               status: 'pending',
             };
             expenses.push(installmentData);
-            if (i < totalNumInstallments) { // Só calcula a próxima data se houver mais parcelas
+            if (i < totalNumInstallments) {
                 currentDueDate = getNextInstallmentDueDate(currentDueDate, dueDayOfMonthCard);
             }
           }
           Alert.alert('Sucesso', `${totalNumInstallments} parcelas de crédito adicionadas com sucesso!`);
           console.log("Parcelas de crédito adicionadas, originalExpenseId:", originalExpenseUniqueId);
         } else if (paymentMethod === 'Fixa') {
-          // Garante que o fixedExpenseDueDay seja ajustado para o último dia do mês se necessário
           let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
           const currentMonth = new Date().getMonth();
           const currentYear = new Date().getFullYear();
@@ -439,7 +437,7 @@ export default function DespesaScreen({ navigation, route }) {
       if (cards.length > 0) {
         setSelectedCardId(cards[0].id);
       } else {
-        setSelectedCardId(''); 
+        setSelectedCardId('');
       }
       setNumInstallments('1');
       setFixedExpenseDueDay('1');
@@ -462,13 +460,13 @@ export default function DespesaScreen({ navigation, route }) {
     }
   };
 
+  const daysInMonth = Array.from({ length: 31 }, (_, i) => String(i + 1));
+
   return (
     <View style={[commonStyles.container, { paddingTop: insets.top }]}>
-      {/* ScrollView para permitir rolagem vertical do formulário */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={commonStyles.title}>{isEditing ? "Editar Despesa" : "Adicionar Nova Despesa"}</Text>
 
-        {/* Campo de input para a descrição da despesa */}
         <TextInput
           style={commonStyles.input}
           placeholder="Descrição da Despesa (Ex: Supermercado, Aluguel)"
@@ -476,7 +474,6 @@ export default function DespesaScreen({ navigation, route }) {
           onChangeText={setExpenseName}
         />
 
-        {/* Campo de input para o valor da despesa */}
         <TextInput
           style={commonStyles.input}
           placeholder="Valor (R$)"
@@ -485,11 +482,9 @@ export default function DespesaScreen({ navigation, route }) {
           onChangeText={(text) => setExpenseValue(text.replace(/[^0-9,.]/g, '').replace('.', ','))}
         />
 
-        {/* Seção para seleção do MÉTODO DE PAGAMENTO (Débito/Crédito/Fixa) */}
         <View style={commonStyles.typeSelectionContainer}>
           <Text style={commonStyles.pickerLabel}>Método de Pagamento:</Text>
           <View style={commonStyles.typeButtonsWrapper}>
-            {/* Botão para "Débito" */}
             <TouchableOpacity
               style={[
                 commonStyles.typeButton,
@@ -503,7 +498,6 @@ export default function DespesaScreen({ navigation, route }) {
               ]}>Débito</Text>
             </TouchableOpacity>
 
-            {/* Botão para "Crédito" */}
             <TouchableOpacity
               style={[
                 commonStyles.typeButton,
@@ -517,7 +511,6 @@ export default function DespesaScreen({ navigation, route }) {
               ]}>Crédito</Text>
             </TouchableOpacity>
 
-            {/* Novo Botão para "Fixa" */}
             <TouchableOpacity
               style={[
                 commonStyles.typeButton,
@@ -533,10 +526,8 @@ export default function DespesaScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Seções visíveis APENAS para despesas do tipo 'Débito' ou 'Crédito' */}
         {(paymentMethod === 'Débito' || paymentMethod === 'Crédito') && (
           <>
-            {/* Seção para seleção da data da compra */}
             <View style={commonStyles.datePickerSection}>
               <Text style={commonStyles.pickerLabel}>Data da Compra:</Text>
               <TouchableOpacity onPress={showDatepicker} style={commonStyles.dateDisplayButton}>
@@ -557,12 +548,10 @@ export default function DespesaScreen({ navigation, route }) {
           </>
         )}
 
-        {/* Seção para seleção de cartão e parcelas (visível apenas para método "Crédito") */}
         {paymentMethod === 'Crédito' && (
           <View style={styles.creditOptionsContainer}>
             {cards.length > 0 ? (
               <>
-                {/* Seletor de Cartões (mantém o Picker nativo aqui) */}
                 <View style={commonStyles.pickerContainer}>
                   <Text style={commonStyles.pickerLabel}>Selecione o Cartão:</Text>
                   <Picker
@@ -570,7 +559,6 @@ export default function DespesaScreen({ navigation, route }) {
                     onValueChange={(itemValue) => setSelectedCardId(itemValue)}
                     style={commonStyles.picker}
                   >
-                    {/* Placeholder sempre como o primeiro item, com value="" */}
                     <Picker.Item label="Selecione um Cartão" value="" />
                     {cards.map(card => (
                       <Picker.Item key={card.id} label={String(card.alias || '')} value={card.id} />
@@ -578,7 +566,6 @@ export default function DespesaScreen({ navigation, route }) {
                   </Picker>
                 </View>
 
-                {/* Campo para número de parcelas */}
                 <View style={styles.installmentInputContainer}>
                   <Text style={commonStyles.pickerLabel}>Número de Parcelas:</Text>
                   <TextInput
@@ -592,7 +579,6 @@ export default function DespesaScreen({ navigation, route }) {
                 </View>
               </>
             ) : (
-              // Mensagem e botão se não houver cartões cadastrados
               <View style={styles.noCardsMessageContainer}>
                 <Text style={styles.noCardsText}>Nenhum cartão cadastrado. Cadastre um para usar o crédito!</Text>
                 <TouchableOpacity
@@ -606,22 +592,23 @@ export default function DespesaScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Campo para o Dia do Pagamento (visível apenas para método "Fixa") - VOLTA A SER UM TEXTINPUT */}
         {paymentMethod === 'Fixa' && (
           <View style={styles.fixedExpenseDayContainer}>
             <Text style={commonStyles.pickerLabel}>Dia do Pagamento (1-31):</Text>
-            <TextInput
-              style={commonStyles.input}
-              placeholder="Ex: 5, 10, 20"
-              keyboardType="numeric"
-              value={fixedExpenseDueDay}
-              onChangeText={(text) => setFixedExpenseDueDay(text.replace(/[^0-9]/g, ''))}
-              maxLength={2} // Limita a 2 dígitos
-            />
+            <View style={commonStyles.pickerContainer}>
+              <Picker
+                selectedValue={fixedExpenseDueDay}
+                onValueChange={(itemValue) => setFixedExpenseDueDay(itemValue)}
+                style={commonStyles.picker}
+              >
+                {daysInMonth.map(day => (
+                  <Picker.Item key={day} label={day} value={day} />
+                ))}
+              </Picker>
+            </View>
           </View>
         )}
 
-        {/* Botão para Salvar/Adicionar Despesa */}
         <TouchableOpacity
           style={commonStyles.addButton}
           onPress={handleSaveExpense}
