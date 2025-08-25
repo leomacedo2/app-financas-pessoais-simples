@@ -9,10 +9,15 @@
  * O React Navigation é projetado para envolver essas strings em `<Text>` internamente,
  * evitando problemas de renderização que podem ocorrer com o uso de funções anônimas
  * retornando `<Text>` explicitamente.
+ *
+ * ATUALIZAÇÃO PARA EDIÇÃO DE DESPESAS:
+ * Criado um 'DespesaNavigator' (Stack Navigator) para a aba de Despesas.
+ * Isso permite que a 'DespesaScreen' atue como uma tela que pode receber parâmetros
+ * para edição, sendo 'empilhada' na navegação, em vez de ser apenas uma tela de aba simples.
+ * A navegação da HomeScreen para a edição de despesas agora usará o DespesaNavigator.
  */
 
 import React from 'react';
-// Removido 'Text' do React Native daqui, pois não será mais usado diretamente no tabBarLabel
 import { NavigationContainer } from '@react-navigation/native'; // Componente principal de navegação
 import { createNativeStackNavigator } from '@react-navigation/native-stack'; // Para navegação em pilha (telas uma sobre a outra)
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'; // Para navegação por abas na parte inferior
@@ -46,6 +51,21 @@ function ReceitaNavigator() {
     </ReceitaStack.Navigator>
   );
 }
+
+/**
+ * Componente que define a pilha de navegação para a aba "Despesa".
+ * Agora permite navegar para a DespesaScreen e passar parâmetros para edição.
+ */
+const DespesaStack = createNativeStackNavigator(); // NOVO: Pilha para as despesas
+function DespesaNavigator() { // NOVO: Componente navegador de despesas
+  return (
+    <DespesaStack.Navigator screenOptions={{ headerShown: false }}>
+      {/* Tela principal de despesas, pode ser usada para adicionar ou editar */}
+      <DespesaStack.Screen name="DespesaScreenInternal" component={DespesaScreen} />
+    </DespesaStack.Navigator>
+  );
+}
+
 
 /**
  * Componente que define a pilha de navegação para a aba "Cartão".
@@ -83,7 +103,7 @@ function HomeTabs() {
             iconName = focused ? 'home' : 'home-outline'; // Ícone preenchido quando focado, contorno quando não
           } else if (route.name === 'ReceitaTab') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
-          } else if (route.name === 'Despesa') {
+          } else if (route.name === 'DespesaTab') { // Alterado para DespesaTab para usar o Navigator
             iconName = focused ? 'remove-circle' : 'remove-circle-outline';
           } else if (route.name === 'CartaoTab') {
             iconName = focused ? 'card' : 'card-outline';
@@ -119,8 +139,8 @@ function HomeTabs() {
         options={{ tabBarLabel: 'Receita' }} // SIMPLIFICADO: Apenas a string 'Receita'
       />
       <Tab.Screen
-        name="Despesa"
-        component={DespesaScreen}
+        name="DespesaTab" // NOVO: Usando o DespesaNavigator para esta aba
+        component={DespesaNavigator}
         options={{ tabBarLabel: 'Despesa' }} // SIMPLIFICADO: Apenas a string 'Despesa'
       />
       <Tab.Screen

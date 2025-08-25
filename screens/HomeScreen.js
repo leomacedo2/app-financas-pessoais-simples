@@ -51,7 +51,6 @@ const getMonthName = (date) => {
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
-  // Garante que o índice seja válido para evitar 'undefined'
   if (d.getMonth() >= 0 && d.getMonth() < monthNames.length) {
     return monthNames[d.getMonth()];
   }
@@ -139,7 +138,7 @@ const generateRandomExpensesData = (monthsToConsider) => {
 };
 
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) { // Adicionado 'navigation' como prop
   const insets = useSafeAreaInsets();
 
   const [loadingApp, setLoadingApp] = useState(true);
@@ -469,6 +468,15 @@ export default function HomeScreen() {
 
   const valorFinalDisplayedMonth = currentMonthTotalIncome - totalDespesasDisplayedMonth;
 
+  // Handler para navegar para a tela de edição
+  const handleEditExpense = (expense) => {
+    // Navega para a aba 'DespesaTab' e dentro dela, para a 'DespesaScreenInternal', passando a despesa
+    navigation.navigate('DespesaTab', {
+      screen: 'DespesaScreenInternal',
+      params: { expenseToEdit: expense },
+    });
+  };
+
   const renderMonthSection = ({ item: monthDate, index }) => {
     const expenses = getExpensesForMonth(monthDate, allExpenses, true);
     const monthName = getMonthName(monthDate);
@@ -494,7 +502,12 @@ export default function HomeScreen() {
           {expenses.length > 0 ? (
             <ScrollView style={styles.expensesScrollView}>
               {expenses.map((item) => (
-                <View key={String(item.id)} style={styles.debitItemRow}>
+                // Cada item da despesa agora é um TouchableOpacity para permitir a edição
+                <TouchableOpacity 
+                  key={String(item.id)} 
+                  style={styles.debitItemRow}
+                  onPress={() => handleEditExpense(item)} // Chama o handler de edição
+                >
                   <Text style={[styles.debitText, styles.descriptionColumn]}>{String(item.description)}</Text>
                   <Text style={[styles.debitText, styles.dateColumn]}>
                     {String(formatDateForDisplay(new Date(item.dueDate)))}
@@ -502,7 +515,7 @@ export default function HomeScreen() {
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           ) : (
@@ -564,7 +577,7 @@ export default function HomeScreen() {
       
     } catch (error) {
       console.error("HomeScreen: Erro ao limpar dados:", error);
-      Alert.alert('Erro', `Não foi possível limpar os dados: ${error.message}`);
+      Alert.alert('Erro', `Ocorreu um erro ao limpar os dados: ${error.message}`);
     } finally {
       setLoadingApp(false);
     }
