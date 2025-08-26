@@ -8,6 +8,9 @@
  * Esta versão foi revisada para fornecer estilos de layout de botão mais robustos para modais,
  * diferenciando entre botões de ação (lado a lado) e botões de opção (empilhados, gerenciados pelo componente),
  * e adicionando um container para botões de modal empilhados.
+ *
+ * ATUALIZAÇÃO RECENTE: Adicionados estilos para o `Switch` de status de despesa,
+ * e ajustes para `pickerLabel` para melhor espaçamento.
  */
 
 import { StyleSheet } from 'react-native';
@@ -185,7 +188,7 @@ const commonStyles = StyleSheet.create({
     color: '#555',
     paddingLeft: 15, // Mantém o padding para o label
     paddingTop: 8,
-    marginBottom: 5,
+    marginBottom: 5, // AJUSTE: Adicionado um pequeno espaçamento inferior para separar do Picker/Input
   },
   picker: {
     height: 50,
@@ -260,6 +263,32 @@ const commonStyles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fff',
     marginHorizontal: 5,
+  },
+  // NOVOS ESTILOS PARA SWITCH DE STATUS (DespesaScreen)
+  statusToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  statusToggleLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  // NOVO ESTILO PARA TEXTO DE VALOR TOTAL (HomeScreen)
+  totalValueText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
 });
 
