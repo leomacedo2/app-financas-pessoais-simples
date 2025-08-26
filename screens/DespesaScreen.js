@@ -69,10 +69,17 @@
  *
  * CORREÇÃO DE LOOP E PERSISTÊNCIA: Ajustada a dependência da `useCallback` de `loadCards`
  * e adicionado `navigation.setParams({ expenseToEdit: undefined });` para limpar os parâmetros da rota.
+ *
+ * NOVIDADE: 2025-08-26 - Implementada funcionalidade de Exclusão Suave (Soft Delete)
+ * de despesas.
+ * - Adicionado um botão "Excluir Despesa" na tela de edição.
+ * - Ao excluir, a despesa é marcada como `status: 'inactive'` e recebe um `deletedAt` timestamp
+ * no AsyncStorage, em vez de ser removida permanentemente.
+ * - Um modal de confirmação foi adicionado para evitar exclusões acidentais.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator, ScrollView, Switch, Modal, Pressable } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -180,11 +187,12 @@ export default function DespesaScreen({ navigation, route }) {
   const [currentExpenseStatus, setCurrentExpenseStatus] = useState('pending'); // Padrão 'pending'
   const [currentExpensePaidAt, setCurrentExpensePaidAt] = useState(null);
   const [currentExpenseDeletedAt, setCurrentExpenseDeletedAt] = useState(null);
+  
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // NOVO: Estado para o modal de exclusão
 
   const [isInstallmentsEditable, setIsInstallmentsEditable] = useState(true);
 
   // Carrega os cartões ativos do AsyncStorage para exibição no Picker
-  // CORREÇÃO: Removido selectedCardId das dependências da useCallback de loadCards.
   const loadCards = useCallback(async () => {
     try {
       const storedCardsJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.CARDS);
@@ -195,33 +203,27 @@ export default function DespesaScreen({ navigation, route }) {
       console.log("DespesaScreen: Cartões ativos carregados:", activeCards.map(c => ({id: c.id, alias: c.alias, dueDayOfMonth: c.dueDayOfMonth})));
 
       // Logic to set/update selectedCardId
-      // CORREÇÃO: Usando atualização de estado funcional para evitar selectedCardId como dependência
       setSelectedCardId(prevSelectedCardId => {
         if (activeCards.length > 0) {
-          // Se houver uma seleção anterior e ela ainda estiver em activeCards, mantém-na
           if (prevSelectedCardId && activeCards.some(card => card.id === prevSelectedCardId)) {
             return prevSelectedCardId;
           } else {
-            // Caso contrário, seleciona o primeiro cartão ativo
             return activeCards[0].id;
           }
         } else {
-          // Sem cartões ativos, limpa a seleção
           return '';
         }
       });
     } catch (error) {
       console.error("DespesaScreen: Erro ao carregar cartões do AsyncStorage:", error);
     }
-  }, []); // CORREÇÃO: loadCards agora é estável e não depende de selectedCardId
+  }, []);
 
   // useFocusEffect para inicializar/resetar a tela ao focar
-  // CORREÇÃO: Removido `cards` da lista de dependências para evitar loop infinito.
   useFocusEffect(
     useCallback(() => {
       loadCards();
 
-      // Verifica se há uma despesa para editar nos parâmetros da rota
       if (route.params?.expenseToEdit) {
         const expense = route.params.expenseToEdit;
         setIsEditing(true);
@@ -252,14 +254,13 @@ export default function DespesaScreen({ navigation, route }) {
         setCurrentExpenseDeletedAt(expense.deletedAt || null);
 
       } else {
-        // Reseta todos os estados para o modo "Adicionar Nova Despesa"
         setIsEditing(false);
         setCurrentExpenseId(null);
         setExpenseName('');
         setExpenseValue('');
         setPurchaseDate(new Date());
         setPaymentMethod('Débito');
-        // A seleção de cartão será tratada pelo loadCards logo acima
+        setSelectedCardId(''); 
         setNumInstallments('1');
         setFixedExpenseDueDay('1');
         setCurrentExpenseStatus('pending');
@@ -268,17 +269,11 @@ export default function DespesaScreen({ navigation, route }) {
         setIsInstallmentsEditable(true);
       }
 
-      // CORREÇÃO: Limpa explicitamente o parâmetro `expenseToEdit` após o processamento
-      // Isso garante que a próxima vez que a tela for focada sem um novo parâmetro, ela se resete.
-      // O `navigation` é estável e não precisa ser uma dependência para useCallback neste caso.
       return () => {
         navigation.setParams({ expenseToEdit: undefined });
       };
-    }, [navigation, route.params?.expenseToEdit, loadCards]) // CORREÇÃO: Dependências ajustadas
+    }, [navigation, route.params?.expenseToEdit, loadCards])
   );
-
-  // Removido o useEffect anterior que dependia apenas de route.params?.expenseToEdit
-  // Sua lógica foi consolidada no useFocusEffect.
 
   // Handler para mudança de data no DateTimePicker
   const handleDateChange = (event, selectedDate) => {
@@ -476,7 +471,6 @@ export default function DespesaScreen({ navigation, route }) {
       setExpenseValue('');
       setPaymentMethod('Débito');
       setPurchaseDate(new Date());
-      // A seleção de cartão será atualizada pelo loadCards no próximo foco
       setSelectedCardId(''); 
       setNumInstallments('1');
       setFixedExpenseDueDay('1');
@@ -488,13 +482,49 @@ export default function DespesaScreen({ navigation, route }) {
       setIsInstallmentsEditable(true);
 
       setTimeout(() => {
-        // Volta para a tela anterior
         navigation.goBack(); 
       }, 100);
 
     } catch (error) {
       console.error("DespesaScreen: Erro ao salvar despesa no AsyncStorage:", error);
       Alert.alert('Erro', `Ocorreu um erro ao salvar a despesa: ${error.message}. Tente novamente.`);
+    } finally {
+      setSavingExpense(false);
+    }
+  };
+
+  /**
+   * Função para lidar com a exclusão suave (soft delete) de uma despesa.
+   * Marca a despesa como inativa e adiciona um timestamp de exclusão.
+   */
+  const handleDeleteExpense = async () => {
+    if (!currentExpenseId) {
+      console.warn('Tentativa de excluir despesa sem ID.');
+      return;
+    }
+
+    setSavingExpense(true); // Usar o mesmo indicador de loading
+    setShowDeleteModal(false); // Fecha o modal de confirmação
+
+    try {
+      let expenses = JSON.parse(await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES)) || [];
+      const updatedExpenses = expenses.map(exp => {
+        if (exp.id === currentExpenseId) {
+          return {
+            ...exp,
+            status: 'inactive', // Marca como inativa
+            deletedAt: new Date().toISOString(), // Adiciona timestamp de exclusão
+          };
+        }
+        return exp;
+      });
+
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses));
+      Alert.alert('Sucesso', 'Despesa excluída com sucesso (marcada como inativa)!');
+      navigation.goBack(); // Volta para a tela anterior
+    } catch (error) {
+      console.error('Erro ao excluir despesa:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao excluir a despesa. Tente novamente.');
     } finally {
       setSavingExpense(false);
     }
@@ -689,7 +719,50 @@ export default function DespesaScreen({ navigation, route }) {
             <Text style={commonStyles.buttonText}>{isEditing ? "Salvar Alterações" : "Adicionar Despesa"}</Text>
           )}
         </TouchableOpacity>
+
+        {/* Botão para Excluir Despesa (aparece apenas em modo de edição) */}
+        {isEditing && (
+          <TouchableOpacity
+            style={commonStyles.deleteButton} // Estilo para o botão de exclusão
+            onPress={() => setShowDeleteModal(true)} // Abre o modal de confirmação
+            disabled={savingExpense} // Desabilita enquanto salva/exclui
+          >
+            <Text style={commonStyles.buttonText}>Excluir Despesa</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showDeleteModal}
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <Pressable style={commonStyles.centeredView} onPressOut={() => setShowDeleteModal(false)}>
+          <Pressable style={commonStyles.modalView} onPress={(e) => e.stopPropagation()}>
+            <Text style={commonStyles.modalTitle}>Confirmar Exclusão</Text>
+            <Text style={commonStyles.modalText}>
+              Tem certeza que deseja excluir esta despesa?
+              Ela será marcada como inativa e não aparecerá nos resumos.
+            </Text>
+            <View style={commonStyles.modalActionButtonsContainer}>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonDanger]}
+                onPress={handleDeleteExpense}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Excluir</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonClose]}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
