@@ -250,10 +250,17 @@ export default function DespesaScreen({ navigation, route }) {
         setIsEditing(true);
         setCurrentExpenseId(baseId); // Usa o ID base
         setExpenseName(expense.description);
-        setExpenseValue(expense.value.toFixed(2).replace('.', ','));
+        
+        // Para despesas de crédito, calcula o valor total
+        if (expense.paymentMethod === 'Crédito') {
+          const valorTotal = expense.value * (expense.totalInstallments || 1);
+          setExpenseValue(valorTotal.toFixed(2).replace('.', ','));
+        } else {
+          setExpenseValue(expense.value.toFixed(2).replace('.', ','));
+        }
 
         setPaymentMethod(expense.paymentMethod || 'Débito');
-        setIsInstallmentsEditable(!(expense.paymentMethod === 'Crédito' && expense.totalInstallments > 1));
+        setIsInstallmentsEditable(true); // Sempre permite editar parcelas
 
         if (expense.paymentMethod === 'Débito') {
           setPurchaseDate(new Date(expense.purchaseDate || expense.createdAt));
@@ -261,7 +268,7 @@ export default function DespesaScreen({ navigation, route }) {
         } else if (expense.paymentMethod === 'Crédito') {
           setPurchaseDate(new Date(expense.purchaseDate || expense.createdAt));
           setSelectedCardId(expense.cardId || '');
-          setNumInstallments(String(expense.totalInstallments || 1));
+          setNumInstallments(String(expense.totalInstallments || '1')); // Garante que seja string
           setFixedExpenseDueDay('1');
         } else if (expense.paymentMethod === 'Fixa') {
           setPurchaseDate(new Date());
@@ -384,10 +391,9 @@ export default function DespesaScreen({ navigation, route }) {
           if (expenseToEdit.paymentMethod === 'Crédito') {
             const targetParts = targetId.split('-');
             const baseId = targetParts[0];
-            const installmentNum = targetParts.length > 1 ? targetParts[1] : '1';
             
-            return exp.originalExpenseId === baseId && 
-                   exp.installmentNumber === parseInt(installmentNum, 10);
+            // Para crédito, procura todas as parcelas da mesma despesa
+            return exp.originalExpenseId === baseId;
           }
           
           return exp.id === targetId;
@@ -418,6 +424,7 @@ export default function DespesaScreen({ navigation, route }) {
           updatedExpense = {
             ...updatedExpense,
             description: expenseName.trim(),
+            value: value,  // Adicionando a atualização do valor
             modifiedAt: now
           };
           
@@ -425,7 +432,8 @@ export default function DespesaScreen({ navigation, route }) {
             id: updatedExpense.id,
             tipo: updatedExpense.paymentMethod,
             descrição: updatedExpense.description,
-            valor: updatedExpense.value
+            valorAntigo: exp.value,
+            valorNovo: value
           });
 
           // Adapta os dados da despesa conforme o método de pagamento
@@ -438,12 +446,52 @@ export default function DespesaScreen({ navigation, route }) {
             delete updatedExpense.originalExpenseId;
             delete updatedExpense.dueDayOfMonth;
           } else if (paymentMethod === 'Crédito') {
-            // Para despesas de crédito, mantemos a maioria dos campos originais
-            // mas atualizamos campos comuns e o cartão se necessário
-            if (isInstallmentsEditable) {
-              updatedExpense.purchaseDate = purchaseDate.toISOString();
+            const novoNumParcelas = parseInt(numInstallments, 10);
+            const valorParcela = value / novoNumParcelas;
+
+            // Remove todas as parcelas antigas desta despesa do array
+            expenses = expenses.filter(e => {
+              // Remove tanto pelo id base quanto pelo originalExpenseId
+              return !(e.id.startsWith(expenseToEdit.baseId + '-') || 
+                     (e.originalExpenseId && e.originalExpenseId === expenseToEdit.baseId));
+            });
+
+            // Cria novas parcelas com o número correto
+            const novoPurchaseDate = isInstallmentsEditable ? purchaseDate : new Date(exp.purchaseDate);
+            const selectedCard = cards.find(card => card.id === selectedCardId);
+            
+            for (let i = 1; i <= novoNumParcelas; i++) {
+              const dueDate = new Date(novoPurchaseDate);
+              dueDate.setMonth(dueDate.getMonth() + (i - 1));
+              
+              // Se tem cartão selecionado, ajusta para o dia de vencimento do cartão
+              if (selectedCard) {
+                dueDate.setDate(selectedCard.dueDayOfMonth);
+              }
+
+              const novaParcela = {
+                id: `${expenseToEdit.baseId}-${i}`,
+                description: expenseName.trim(),
+                value: valorParcela,
+                paymentMethod: 'Crédito',
+                purchaseDate: novoPurchaseDate.toISOString(),
+                dueDate: dueDate.toISOString(),
+                cardId: selectedCardId,
+                installmentNumber: i,
+                totalInstallments: novoNumParcelas,
+                originalExpenseId: expenseToEdit.baseId,
+                createdAt: exp.createdAt,
+                modifiedAt: now,
+                status: i === exp.installmentNumber ? exp.status : 'pending',
+                paidAt: i === exp.installmentNumber ? exp.paidAt : null
+              };
+
+              expenses.push(novaParcela);
             }
-            updatedExpense.cardId = selectedCardId;
+            
+            // Como estamos manipulando diretamente o array expenses,
+            // não precisamos mais do updatedExpense para crédito
+            return;
           } else if (paymentMethod === 'Fixa') {
             let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
             const currentMonth = new Date().getMonth();
