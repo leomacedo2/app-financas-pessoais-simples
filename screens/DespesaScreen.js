@@ -124,8 +124,8 @@ export default function DespesaScreen({ navigation, route }) {
       // Logic to set/update selectedCardId
       setSelectedCardId(prevSelectedCardId => {
         if (activeCards.length > 0) {
-          if (prevSelectedCardId && activeCards.some(card => card.id === prevSelectedCardId)) {
-            return prevSelectedCardId;
+          if (prevSelectedCardId && activeCards.some(card => card.id === prevSelectedId)) {
+            return prevSelectedId;
           } else {
             return activeCards[0].id;
           }
@@ -288,161 +288,103 @@ export default function DespesaScreen({ navigation, route }) {
           return;
         }
 
-        // Função auxiliar para encontrar despesa por ID e tipo
-        const findExpense = (exp, targetId) => {
-          // Se é uma despesa fixa mensal
-          if (expenseToEdit.paymentMethod === 'Fixa') {
-            return exp.id === targetId;
-          }
-          
-          // Se é uma parcela de cartão de crédito
-          if (expenseToEdit.paymentMethod === 'Crédito') {
-            const targetParts = targetId.split('-');
-            const baseId = targetParts[0];
-            
-            // Para crédito, procura todas as parcelas da mesma despesa
-            return exp.originalExpenseId === baseId;
-          }
-          
-          return exp.id === targetId;
-        };
-
-        // Encontra a despesa para editar
-        const relatedExpenses = expenses.filter(exp => findExpense(exp, expenseToEdit.id));
-
-        console.log("DEBUG - Filtro de despesas:", {
-          tipo: expenseToEdit.paymentMethod,
-          idBuscado: expenseToEdit.id,
-          encontradas: relatedExpenses.map(exp => exp.id)
-        });
-
-        console.log('Encontradas despesas relacionadas:', relatedExpenses.length);
-
-        if (relatedExpenses.length === 0) {
-          console.warn("Nenhuma despesa encontrada para edição.");
-          return;
-        }
-
-        // Atualiza cada despesa relacionada
-        relatedExpenses.forEach(exp => {
-          let updatedExpense = { ...exp };
-          
-          // Atualiza a despesa com os novos dados básicos
-          const now = new Date().toISOString();
-          updatedExpense = {
-            ...updatedExpense,
-            description: expenseName.trim(),
-            value: value,  // Adicionando a atualização do valor
-            modifiedAt: now
-          };
-          
-          console.log("DEBUG - Atualizando despesa:", {
-            id: updatedExpense.id,
-            tipo: updatedExpense.paymentMethod,
-            descrição: updatedExpense.description,
-            valorAntigo: exp.value,
-            valorNovo: value
-          });
-
-          // Adapta os dados da despesa conforme o método de pagamento
-          if (paymentMethod === 'Débito') {
-            updatedExpense.purchaseDate = purchaseDate.toISOString();
-            updatedExpense.dueDate = purchaseDate.toISOString();
-            delete updatedExpense.cardId;
-            delete updatedExpense.installmentNumber;
-            delete updatedExpense.totalInstallments;
-            delete updatedExpense.originalExpenseId;
-            delete updatedExpense.dueDayOfMonth;
-          } else if (paymentMethod === 'Crédito') {
+        // Lógica para edição de despesa de crédito
+        if (paymentMethod === 'Crédito') {
             const novoNumParcelas = parseInt(numInstallments, 10);
             const valorParcela = value / novoNumParcelas;
+            const now = new Date().toISOString();
+
+            // Encontra o cartão de crédito selecionado para obter o dia de vencimento
+            const selectedCard = cards.find(card => card.id === selectedCardId);
+            if (!selectedCard) {
+                Alert.alert('Erro', 'Cartão selecionado não encontrado. Por favor, tente novamente.');
+                setSavingExpense(false);
+                return;
+            }
+            const dueDayOfMonthCard = selectedCard.dueDayOfMonth;
 
             // Remove todas as parcelas antigas desta despesa do array
-            expenses = expenses.filter(e => {
-              // Remove tanto pelo id base quanto pelo originalExpenseId
-              return !(e.id.startsWith(expenseToEdit.baseId + '-') || 
-                     (e.originalExpenseId && e.originalExpenseId === expenseToEdit.baseId));
-            });
-
-            // Cria novas parcelas com o número correto
-            const novoPurchaseDate = isInstallmentsEditable ? purchaseDate : new Date(exp.purchaseDate);
-            const selectedCard = cards.find(card => card.id === selectedCardId);
+            expenses = expenses.filter(e => e.originalExpenseId !== expenseToEdit.originalExpenseId);
             
+            // Calcula a primeira data de vencimento com base na data da compra original
+            const firstPurchaseDate = new Date(expenseToEdit.purchaseDate);
+            let currentDueDate = getFirstCreditDueDate(firstPurchaseDate, dueDayOfMonthCard);
+
+            // Cria novas parcelas com o número correto e as datas de vencimento ajustadas
             for (let i = 1; i <= novoNumParcelas; i++) {
-              const dueDate = new Date(novoPurchaseDate);
-              dueDate.setMonth(dueDate.getMonth() + (i - 1));
-              
-              // Se tem cartão selecionado, ajusta para o dia de vencimento do cartão
-              if (selectedCard) {
-                dueDate.setDate(selectedCard.dueDayOfMonth);
-              }
+                const novaParcela = {
+                    id: `${expenseToEdit.originalExpenseId}-${i}`,
+                    description: expenseName.trim(),
+                    value: valorParcela,
+                    paymentMethod: 'Crédito',
+                    purchaseDate: firstPurchaseDate.toISOString(),
+                    dueDate: currentDueDate.toISOString(),
+                    cardId: selectedCardId,
+                    installmentNumber: i,
+                    totalInstallments: novoNumParcelas,
+                    originalExpenseId: expenseToEdit.originalExpenseId,
+                    createdAt: expenseToEdit.createdAt,
+                    modifiedAt: now,
+                    status: 'pending', // Assume novas parcelas como pendentes
+                    paidAt: null
+                };
 
-              const novaParcela = {
-                id: `${expenseToEdit.baseId}-${i}`,
-                description: expenseName.trim(),
-                value: valorParcela,
-                paymentMethod: 'Crédito',
-                purchaseDate: novoPurchaseDate.toISOString(),
-                dueDate: dueDate.toISOString(),
-                cardId: selectedCardId,
-                installmentNumber: i,
-                totalInstallments: novoNumParcelas,
-                originalExpenseId: expenseToEdit.baseId,
-                createdAt: exp.createdAt,
-                modifiedAt: now,
-                status: i === exp.installmentNumber ? exp.status : 'pending',
-                paidAt: i === exp.installmentNumber ? exp.paidAt : null
-              };
-
-              expenses.push(novaParcela);
+                expenses.push(novaParcela);
+                
+                // Calcula a data da próxima parcela
+                currentDueDate = getNextInstallmentDueDate(currentDueDate, dueDayOfMonthCard);
             }
-            
-            // Como estamos manipulando diretamente o array expenses,
-            // não precisamos mais do updatedExpense para crédito
-            return;
-          } else if (paymentMethod === 'Fixa') {
-            let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
-            const currentMonth = new Date().getMonth();
-            const currentYear = new Date().getFullYear();
-            const lastDayOfCurrentMonth = getLastDayOfMonth(currentYear, currentMonth);
-            if (dayForFixedExpense > lastDayOfCurrentMonth) {
-                dayForFixedExpense = lastDayOfCurrentMonth;
-            }
-            updatedExpense.dueDayOfMonth = dayForFixedExpense;
-            // Remove campos não utilizados em despesas fixas
-            delete updatedExpense.purchaseDate;
-            delete updatedExpense.cardId;
-            delete updatedExpense.installmentNumber;
-            delete updatedExpense.totalInstallments;
-            delete updatedExpense.originalExpenseId;
-            delete updatedExpense.dueDate;
-          }
-
-          // Atualiza a despesa no array
-          const index = expenses.findIndex(e => e.id === exp.id);
-          if (index !== -1) {
-            expenses[index] = updatedExpense;
-          }
-        });
         
-        Alert.alert('Sucesso', 'Despesa atualizada com sucesso!');
-        console.log("Despesas atualizadas no AsyncStorage:", relatedExpenses.length);
+            Alert.alert('Sucesso', 'Despesa de crédito atualizada com sucesso!');
+
+        } else {
+            // Lógica de edição para Débito e Fixa (mantida como estava)
+            const expenseToUpdate = expenses.find(exp => exp.id === currentExpenseId);
+            if (expenseToUpdate) {
+                const now = new Date().toISOString();
+                let updatedExpense = {
+                    ...expenseToUpdate,
+                    description: expenseName.trim(),
+                    value: value,
+                    modifiedAt: now
+                };
+
+                if (paymentMethod === 'Débito') {
+                    updatedExpense.purchaseDate = purchaseDate.toISOString();
+                    updatedExpense.dueDate = purchaseDate.toISOString();
+                    delete updatedExpense.cardId;
+                    delete updatedExpense.installmentNumber;
+                    delete updatedExpense.totalInstallments;
+                    delete updatedExpense.originalExpenseId;
+                    delete updatedExpense.dueDayOfMonth;
+                } else if (paymentMethod === 'Fixa') {
+                    let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
+                    const currentMonth = new Date().getMonth();
+                    const currentYear = new Date().getFullYear();
+                    const lastDayOfCurrentMonth = getLastDayOfMonth(currentYear, currentMonth);
+                    if (dayForFixedExpense > lastDayOfCurrentMonth) {
+                        dayForFixedExpense = lastDayOfCurrentMonth;
+                    }
+                    updatedExpense.dueDayOfMonth = dayForFixedExpense;
+                    delete updatedExpense.purchaseDate;
+                    delete updatedExpense.cardId;
+                    delete updatedExpense.installmentNumber;
+                    delete updatedExpense.totalInstallments;
+                    delete updatedExpense.originalExpenseId;
+                    delete updatedExpense.dueDate;
+                }
+                const index = expenses.findIndex(e => e.id === currentExpenseId);
+                if (index !== -1) {
+                    expenses[index] = updatedExpense;
+                }
+            }
+            Alert.alert('Sucesso', 'Despesa atualizada com sucesso!');
+        }
         
         // Salva as alterações no AsyncStorage
         try {
-          // Grava no AsyncStorage
           await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
-          
-          console.log("DEBUG - Despesas salvas no AsyncStorage:", {
-            total: expenses.length,
-            atualizadas: relatedExpenses.length,
-            ids: relatedExpenses.map(exp => exp.id)
-          });
-          
-          // Força um recarregamento dos dados antes de navegar de volta
           await AsyncStorage.setItem('LAST_UPDATE', new Date().toISOString());
-          
-          // Navega de volta para a tela inicial
           navigation.navigate('Home', {
             refresh: true,
             timestamp: Date.now()
