@@ -254,11 +254,21 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
 
           const fixedDueDate = new Date(targetYear, targetMonth, dayForFixedExpense);
           
+          // Encontra o status específico para este mês/ano
+          const monthYearKey = `${targetYear}-${targetMonth}`;
+          const monthStatus = item.monthlyStatus?.find(
+            status => status.monthYear === monthYearKey
+          );
+
           expensesForThisMonth.push({
             ...item,
-            dueDate: fixedDueDate.toISOString(), // Atribui a data de vencimento calculada
-            id: `${item.id}-${targetYear}-${targetMonth}`, // ID único para despesas fixas por mês
-            description: `${item.description}` 
+            dueDate: fixedDueDate.toISOString(),
+            id: `${item.id}-${targetYear}-${targetMonth}`,
+            originalId: item.id,
+            description: `${item.description}`,
+            // Usa o status específico do mês se existir, senão usa 'pending'
+            status: monthStatus?.status || 'pending',
+            paidAt: monthStatus?.paidAt || null
           });
         }
       }
@@ -268,7 +278,17 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
           const itemDueDate = new Date(item.dueDate);
           // Inclui a despesa se a data de vencimento (ou compra para débito) for no mês/ano atual
           if (itemDueDate.getMonth() === targetMonth && itemDueDate.getFullYear() === targetYear) {
-            expensesForThisMonth.push(item);
+            // Para despesas de crédito, mantém o ID original com o número da parcela
+            if (item.paymentMethod === 'Crédito') {
+              expensesForThisMonth.push({
+                ...item,
+                // Mantém o ID original com o número da parcela
+                id: item.id,
+                installmentNumber: item.installmentNumber
+              });
+            } else {
+              expensesForThisMonth.push(item);
+            }
           }
         }
       }
@@ -569,8 +589,45 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
    * @param {string} expenseId - O ID da despesa a ser atualizada.
    */
   const handleTogglePaidStatus = useCallback(async (expenseId) => {
-    // Busca a despesa pelo ID na lista de todas as despesas
-    const expenseIndex = allExpenses.findIndex(exp => exp.id === expenseId);
+    // Extrai o ID base e os sufixos do ID completo
+    const [baseId, ...suffixes] = expenseId.split('-');
+    
+    // Busca a despesa que corresponde ao ID ou à parcela
+    let expenseIndex = -1;
+    const originalExpense = allExpenses.find((exp, index) => {
+      if (exp.paymentMethod === 'Crédito') {
+        // Para despesas de crédito, procura pela parcela específica
+        const isMatch = exp.id === expenseId || // ID exato
+                       (exp.originalExpenseId === baseId && exp.installmentNumber === parseInt(suffixes[0], 10)); // Parcela específica
+        if (isMatch) {
+          expenseIndex = index;
+          return true;
+        }
+      } else if (exp.paymentMethod === 'Fixa') {
+        // Para despesas fixas, usa o ID base
+        const isMatch = exp.id === baseId;
+        if (isMatch) {
+          expenseIndex = index;
+          return true;
+        }
+      } else {
+        // Para outras despesas, verifica o ID exato
+        const isMatch = exp.id === expenseId;
+        if (isMatch) {
+          expenseIndex = index;
+          return true;
+        }
+      }
+      return false;
+    });
+
+    if (!originalExpense) {
+      console.warn(`[DEBUG - handleTogglePaidStatus]: Despesa com ID ${expenseId} não encontrada.`);
+      return;
+    }
+
+    console.log(`[DEBUG - handleTogglePaidStatus]: Encontrada despesa tipo ${originalExpense.paymentMethod}, ID: ${expenseId}`);
+
     if (expenseIndex === -1) {
       console.warn(`[DEBUG - handleTogglePaidStatus]: Despesa com ID ${expenseId} não encontrada.`);
       return;
@@ -579,13 +636,52 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     const updatedExpenses = [...allExpenses];
     const expenseToUpdate = { ...updatedExpenses[expenseIndex] };
 
-    // Inverte o status e atualiza a data de pagamento
-    if (expenseToUpdate.status === 'pending') {
-      expenseToUpdate.status = 'paid';
-      expenseToUpdate.paidAt = new Date().toISOString(); // Define a data de agora como data de pagamento
+    // Trata cada tipo de despesa de forma diferente
+    if (expenseToUpdate.paymentMethod === 'Fixa' && suffixes.length === 2) {
+      // Para despesas fixas, gerencia os status por mês
+      const [year, month] = suffixes;
+      if (!expenseToUpdate.monthlyStatus) {
+        expenseToUpdate.monthlyStatus = [];
+      }
+
+      const monthYearKey = `${year}-${month}`;
+      const existingStatusIndex = expenseToUpdate.monthlyStatus.findIndex(
+        status => status.monthYear === monthYearKey
+      );
+
+      if (existingStatusIndex >= 0) {
+        const currentStatus = expenseToUpdate.monthlyStatus[existingStatusIndex].status;
+        expenseToUpdate.monthlyStatus[existingStatusIndex] = {
+          monthYear: monthYearKey,
+          status: currentStatus === 'paid' ? 'pending' : 'paid',
+          paidAt: currentStatus === 'paid' ? null : new Date().toISOString()
+        };
+      } else {
+        expenseToUpdate.monthlyStatus.push({
+          monthYear: monthYearKey,
+          status: 'paid',
+          paidAt: new Date().toISOString()
+        });
+      }
+    } else if (expenseToUpdate.paymentMethod === 'Crédito') {
+      // Para despesas de crédito, atualiza apenas a parcela específica
+      if (expenseToUpdate.status === 'pending') {
+        expenseToUpdate.status = 'paid';
+        expenseToUpdate.paidAt = new Date().toISOString();
+      } else {
+        expenseToUpdate.status = 'pending';
+        expenseToUpdate.paidAt = null;
+      }
+      console.log(`[DEBUG - handleTogglePaidStatus]: Atualizando parcela ${expenseToUpdate.installmentNumber} para status: ${expenseToUpdate.status}`);
     } else {
-      expenseToUpdate.status = 'pending';
-      expenseToUpdate.paidAt = null; // Remove a data de pagamento se for marcada como pendente
+      // Para despesas normais (débito), mantém a lógica original
+      if (expenseToUpdate.status === 'pending') {
+        expenseToUpdate.status = 'paid';
+        expenseToUpdate.paidAt = new Date().toISOString();
+      } else {
+        expenseToUpdate.status = 'pending';
+        expenseToUpdate.paidAt = null;
+      }
     }
 
     updatedExpenses[expenseIndex] = expenseToUpdate;
