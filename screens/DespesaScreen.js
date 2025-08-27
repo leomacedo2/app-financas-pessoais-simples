@@ -356,7 +356,7 @@ export default function DespesaScreen({ navigation, route }) {
       let expenseDataTemplate = {
         description: expenseName.trim(),
         value: value,
-        paymentMethod: paymentMethod,
+        paymentMethod: isEditing ? route.params?.expenseToEdit?.paymentMethod : paymentMethod,
         deletedAt: currentExpenseDeletedAt,
       };
 
@@ -705,49 +705,61 @@ export default function DespesaScreen({ navigation, route }) {
           onChangeText={(text) => setExpenseValue(text.replace(/[^0-9,.]/g, '').replace('.', ','))}
         />
 
-        {/* Seletor de método de pagamento */}
+        {/* Seletor/Exibição de método de pagamento */}
         <View style={commonStyles.typeSelectionContainer}>
           <Text style={commonStyles.pickerLabel}>Método de Pagamento:</Text>
-          <View style={commonStyles.typeButtonsWrapper}>
-            <TouchableOpacity
-              style={[
-                commonStyles.typeButton,
-                paymentMethod === 'Débito' ? commonStyles.typeButtonSelected : commonStyles.typeButtonUnselected
-              ]}
-              onPress={() => setPaymentMethod('Débito')}
-            >
-              <Text style={[
-                commonStyles.typeButtonText,
-                paymentMethod === 'Débito' ? commonStyles.typeButtonTextSelected : commonStyles.typeButtonTextUnselected
-              ]}>Débito</Text>
-            </TouchableOpacity>
+          {isEditing ? (
+            // Quando estiver editando, apenas mostra o método atual
+            <View style={[commonStyles.typeButtonsWrapper, { opacity: 0.7 }]}>
+              <View style={[commonStyles.typeButton, commonStyles.typeButtonSelected]}>
+                <Text style={[commonStyles.typeButtonText, commonStyles.typeButtonTextSelected]}>
+                  {paymentMethod}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            // Quando estiver criando, permite selecionar o método
+            <View style={commonStyles.typeButtonsWrapper}>
+              <TouchableOpacity
+                style={[
+                  commonStyles.typeButton,
+                  paymentMethod === 'Débito' ? commonStyles.typeButtonSelected : commonStyles.typeButtonUnselected
+                ]}
+                onPress={() => setPaymentMethod('Débito')}
+              >
+                <Text style={[
+                  commonStyles.typeButtonText,
+                  paymentMethod === 'Débito' ? commonStyles.typeButtonTextSelected : commonStyles.typeButtonTextUnselected
+                ]}>Débito</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                commonStyles.typeButton,
-                paymentMethod === 'Crédito' ? commonStyles.typeButtonSelected : commonStyles.typeButtonUnselected
-              ]}
-              onPress={() => setPaymentMethod('Crédito')}
-            >
-              <Text style={[
-                commonStyles.typeButtonText,
-                paymentMethod === 'Crédito' ? commonStyles.typeButtonTextSelected : commonStyles.typeButtonTextUnselected
-              ]}>Crédito</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  commonStyles.typeButton,
+                  paymentMethod === 'Crédito' ? commonStyles.typeButtonSelected : commonStyles.typeButtonUnselected
+                ]}
+                onPress={() => setPaymentMethod('Crédito')}
+              >
+                <Text style={[
+                  commonStyles.typeButtonText,
+                  paymentMethod === 'Crédito' ? commonStyles.typeButtonTextSelected : commonStyles.typeButtonTextUnselected
+                ]}>Crédito</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                commonStyles.typeButton,
-                paymentMethod === 'Fixa' ? commonStyles.typeButtonSelected : commonStyles.typeButtonUnselected
-              ]}
-              onPress={() => setPaymentMethod('Fixa')}
-            >
-              <Text style={[
-                commonStyles.typeButtonText,
-                paymentMethod === 'Fixa' ? commonStyles.typeButtonTextSelected : commonStyles.typeButtonTextUnselected
-              ]}>Fixa</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={[
+                  commonStyles.typeButton,
+                  paymentMethod === 'Fixa' ? commonStyles.typeButtonSelected : commonStyles.typeButtonUnselected
+                ]}
+                onPress={() => setPaymentMethod('Fixa')}
+              >
+                <Text style={[
+                  commonStyles.typeButtonText,
+                  paymentMethod === 'Fixa' ? commonStyles.typeButtonTextSelected : commonStyles.typeButtonTextUnselected
+                ]}>Fixa</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Campos de Data da Compra (para Débito e Crédito) */}
