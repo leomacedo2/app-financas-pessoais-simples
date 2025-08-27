@@ -462,10 +462,14 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
   // Efeito que garante que os dados sejam recarregados sempre que a tela Home for focada
   useFocusEffect(
     useCallback(() => {
-      scrollAttempted.current = false; 
-      loadData(); 
-      return () => {
+      scrollAttempted.current = false;
+      // Recarrega os dados da tela
+      const fetchData = async () => {
+        console.log("HomeScreen: Recarregando dados após foco");
+        await loadData();
       };
+      fetchData();
+      return () => {};
     }, [loadData])
   );
 
