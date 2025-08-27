@@ -306,9 +306,8 @@ export default function DespesaScreen({ navigation, route }) {
             // Remove todas as parcelas antigas desta despesa do array
             expenses = expenses.filter(e => e.originalExpenseId !== expenseToEdit.originalExpenseId);
             
-            // Calcula a primeira data de vencimento com base na data da compra original
-            const firstPurchaseDate = new Date(expenseToEdit.purchaseDate);
-            let currentDueDate = getFirstCreditDueDate(firstPurchaseDate, dueDayOfMonthCard);
+            // Corrige o bug: usa a nova `purchaseDate` do estado para o recalculo
+            let currentDueDate = getFirstCreditDueDate(purchaseDate, dueDayOfMonthCard);
 
             // Cria novas parcelas com o número correto e as datas de vencimento ajustadas
             for (let i = 1; i <= novoNumParcelas; i++) {
@@ -317,7 +316,7 @@ export default function DespesaScreen({ navigation, route }) {
                     description: expenseName.trim(),
                     value: valorParcela,
                     paymentMethod: 'Crédito',
-                    purchaseDate: firstPurchaseDate.toISOString(),
+                    purchaseDate: purchaseDate.toISOString(), // Usa a nova data de compra
                     dueDate: currentDueDate.toISOString(),
                     cardId: selectedCardId,
                     installmentNumber: i,
