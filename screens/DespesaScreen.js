@@ -124,8 +124,8 @@ export default function DespesaScreen({ navigation, route }) {
       // Logic to set/update selectedCardId
       setSelectedCardId(prevSelectedCardId => {
         if (activeCards.length > 0) {
-          if (prevSelectedCardId && activeCards.some(card => card.id === prevSelectedId)) {
-            return prevSelectedId;
+          if (prevSelectedCardId && activeCards.some(card => card.id === prevSelectedCardId)) {
+            return prevSelectedCardId;
           } else {
             return activeCards[0].id;
           }
