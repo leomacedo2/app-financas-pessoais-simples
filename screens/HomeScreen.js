@@ -1,4 +1,48 @@
 // screens/HomeScreen.js
+
+/**
+ * @file HomeScreen.js
+ * @description Esta tela é a principal do aplicativo, exibindo um resumo financeiro
+ * e uma lista horizontal rolável de despesas por mês.
+ *
+ * Funcionalidades principais:
+ * - Exibição paginada de despesas para meses passados e futuros.
+ * - Cálculo e exibição da receita total e valor final para o mês visível.
+ * - Geração de despesas aleatórias para TODOS os meses no range.
+ * - O mês atual do sistema é SEMPRE exibido na FlatList e a rolagem inicial vai para ele.
+ * - Sincronização de dados de receitas e despesas com AsyncStorage.
+ * - Modal aprimorado para limpeza de dados, permitindo a seleção de Mês/Ano para exclusão suave.
+ *
+ * Atualizações:
+ * - 2025-08-26 (NOVIDADE): Adicionado o status "Vence Amanhã" na função `getStatusText`
+ * para despesas pendentes que vencem no dia seguinte.
+ * - 2025-08-26 (NOVIDADE): Implementada a funcionalidade de "Toque Longo" para editar despesas.
+ * - Agora, um *toque longo* em um item da lista de despesas navegará para a tela de edição.
+ * - O *toque simples* na checkbox continua a alternar o status de pago/pendente,
+ * eliminando o "miss click" que ocorria ao tentar marcar/desmarcar a despesa.
+ * - 2025-08-26 (CORRIGIDO): Correção do erro de digitação `ASYC_STORAGE_KEYS` para `ASYNC_STORAGE_KEYS`
+ * na função `handleGenerateRandomExpenses` (linha 420).
+ * - 2025-08-26 (CORRIGIDO): Revisão de todos os componentes `<Text>` para garantir que apenas strings
+ * ou variáveis de string sejam passadas como filhos, evitando comentários JSX internos
+ * que podem causar o aviso "Text strings must be rendered within a <Text> component".
+ * - 2025-08-26 (REVISADO): Refatoração do layout da lista de despesas na HomeScreen.
+ * - A coluna "Status/Vencimento" foi removida do cabeçalho da lista de despesas.
+ * - As informações de status (Pago/Pendente/Atrasado/Vence) foram movidas para um "rodapézinho"
+ * abaixo da descrição da despesa, utilizando uma fonte menor e cor mais discreta (`expenseStatusFooter`).
+ * - O `marginRight` do `checkboxContainer` foi aumentado e o `paddingVertical` dos itens da lista
+ * (`debitItemRow`) foi ajustado para melhorar o espaçamento e a área de toque, prevenindo cliques acidentais
+ * e proporcionando mais "respiro" visual entre os itens.
+ * - A função `getStatusText` foi aprimorada para incluir o status "Atrasado" quando aplicável.
+ * - 2024-08-15: RESOLVIDO DEFINITIVAMENTE: Flicker de Rolagem (Agosto 2024 -> Agosto 2025).
+ * - A lógica de inicialização da rolagem foi **completamente reestruturada**.
+ * - Agora, o `currentMonthIndex` (que serve como `initialScrollIndex` da `FlatList`)
+ * é calculado e atualizado *dentro do `loadData`*, logo após o carregamento dos dados
+ * e a estabilização da lista de meses filtrados (`filteredMonthsToDisplay`).
+ * - Isso garante que a `FlatList` já renderize no mês correto (Agosto de 2025) desde
+ * a sua primeira aparição após o `loading` ser definido como `false`.
+ * - 2024-08-10: Implementação inicial da `HomeScreen` com exibição de despesas e resumo.
+ */
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -210,11 +254,21 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
 
           const fixedDueDate = new Date(targetYear, targetMonth, dayForFixedExpense);
           
+          // Encontra o status específico para este mês/ano
+          const monthYearKey = `${targetYear}-${targetMonth}`;
+          const monthStatus = item.monthlyStatus?.find(
+            status => status.monthYear === monthYearKey
+          );
+
           expensesForThisMonth.push({
             ...item,
-            dueDate: fixedDueDate.toISOString(), // Atribui a data de vencimento calculada
-            id: `${item.id}-${targetYear}-${targetMonth}`, // ID único para despesas fixas por mês
-            description: `${item.description}` 
+            dueDate: fixedDueDate.toISOString(),
+            id: `${item.id}-${targetYear}-${targetMonth}`,
+            originalId: item.id,
+            description: `${item.description}`,
+            // Usa o status específico do mês se existir, senão usa 'pending'
+            status: monthStatus?.status || 'pending',
+            paidAt: monthStatus?.paidAt || null
           });
         }
       }
@@ -224,7 +278,17 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
           const itemDueDate = new Date(item.dueDate);
           // Inclui a despesa se a data de vencimento (ou compra para débito) for no mês/ano atual
           if (itemDueDate.getMonth() === targetMonth && itemDueDate.getFullYear() === targetYear) {
-            expensesForThisMonth.push(item);
+            // Para despesas de crédito, mantém o ID original com o número da parcela
+            if (item.paymentMethod === 'Crédito') {
+              expensesForThisMonth.push({
+                ...item,
+                // Mantém o ID original com o número da parcela
+                id: item.id,
+                installmentNumber: item.installmentNumber
+              });
+            } else {
+              expensesForThisMonth.push(item);
+            }
           }
         }
       }
@@ -398,10 +462,14 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
   // Efeito que garante que os dados sejam recarregados sempre que a tela Home for focada
   useFocusEffect(
     useCallback(() => {
-      scrollAttempted.current = false; 
-      loadData(); 
-      return () => {
+      scrollAttempted.current = false;
+      // Recarrega os dados da tela
+      const fetchData = async () => {
+        console.log("HomeScreen: Recarregando dados após foco");
+        await loadData();
       };
+      fetchData();
+      return () => {};
     }, [loadData])
   );
 
@@ -503,12 +571,19 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
    * Handler para navegar para a tela de edição de despesa.
    * Navega para a aba 'DespesaTab' e, dentro dela, para a tela 'DespesaScreenInternal',
    * passando a despesa a ser editada como parâmetro.
+   * Agora acionado por *toque longo*.
    * @param {object} expense - O objeto de despesa a ser editado.
    */
   const handleEditExpense = (expense) => {
+    // Se for uma despesa fixa, usa o ID original (sem o sufixo de mês/ano)
+    const expenseToEdit = {
+      ...expense,
+      id: expense.id.split('-')[0] // Remove o sufixo se existir
+    };
+    
     navigation.navigate('DespesaTab', {
       screen: 'DespesaScreenInternal',
-      params: { expenseToEdit: expense },
+      params: { expenseToEdit: expenseToEdit },
     });
   };
 
@@ -518,8 +593,45 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
    * @param {string} expenseId - O ID da despesa a ser atualizada.
    */
   const handleTogglePaidStatus = useCallback(async (expenseId) => {
-    // Busca a despesa pelo ID na lista de todas as despesas
-    const expenseIndex = allExpenses.findIndex(exp => exp.id === expenseId);
+    // Extrai o ID base e os sufixos do ID completo
+    const [baseId, ...suffixes] = expenseId.split('-');
+    
+    // Busca a despesa que corresponde ao ID ou à parcela
+    let expenseIndex = -1;
+    const originalExpense = allExpenses.find((exp, index) => {
+      if (exp.paymentMethod === 'Crédito') {
+        // Para despesas de crédito, procura pela parcela específica
+        const isMatch = exp.id === expenseId || // ID exato
+                       (exp.originalExpenseId === baseId && exp.installmentNumber === parseInt(suffixes[0], 10)); // Parcela específica
+        if (isMatch) {
+          expenseIndex = index;
+          return true;
+        }
+      } else if (exp.paymentMethod === 'Fixa') {
+        // Para despesas fixas, usa o ID base
+        const isMatch = exp.id === baseId;
+        if (isMatch) {
+          expenseIndex = index;
+          return true;
+        }
+      } else {
+        // Para outras despesas, verifica o ID exato
+        const isMatch = exp.id === expenseId;
+        if (isMatch) {
+          expenseIndex = index;
+          return true;
+        }
+      }
+      return false;
+    });
+
+    if (!originalExpense) {
+      console.warn(`[DEBUG - handleTogglePaidStatus]: Despesa com ID ${expenseId} não encontrada.`);
+      return;
+    }
+
+    console.log(`[DEBUG - handleTogglePaidStatus]: Encontrada despesa tipo ${originalExpense.paymentMethod}, ID: ${expenseId}`);
+
     if (expenseIndex === -1) {
       console.warn(`[DEBUG - handleTogglePaidStatus]: Despesa com ID ${expenseId} não encontrada.`);
       return;
@@ -528,13 +640,52 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     const updatedExpenses = [...allExpenses];
     const expenseToUpdate = { ...updatedExpenses[expenseIndex] };
 
-    // Inverte o status e atualiza a data de pagamento
-    if (expenseToUpdate.status === 'pending') {
-      expenseToUpdate.status = 'paid';
-      expenseToUpdate.paidAt = new Date().toISOString(); // Define a data de agora como data de pagamento
+    // Trata cada tipo de despesa de forma diferente
+    if (expenseToUpdate.paymentMethod === 'Fixa' && suffixes.length === 2) {
+      // Para despesas fixas, gerencia os status por mês
+      const [year, month] = suffixes;
+      if (!expenseToUpdate.monthlyStatus) {
+        expenseToUpdate.monthlyStatus = [];
+      }
+
+      const monthYearKey = `${year}-${month}`;
+      const existingStatusIndex = expenseToUpdate.monthlyStatus.findIndex(
+        status => status.monthYear === monthYearKey
+      );
+
+      if (existingStatusIndex >= 0) {
+        const currentStatus = expenseToUpdate.monthlyStatus[existingStatusIndex].status;
+        expenseToUpdate.monthlyStatus[existingStatusIndex] = {
+          monthYear: monthYearKey,
+          status: currentStatus === 'paid' ? 'pending' : 'paid',
+          paidAt: currentStatus === 'paid' ? null : new Date().toISOString()
+        };
+      } else {
+        expenseToUpdate.monthlyStatus.push({
+          monthYear: monthYearKey,
+          status: 'paid',
+          paidAt: new Date().toISOString()
+        });
+      }
+    } else if (expenseToUpdate.paymentMethod === 'Crédito') {
+      // Para despesas de crédito, atualiza apenas a parcela específica
+      if (expenseToUpdate.status === 'pending') {
+        expenseToUpdate.status = 'paid';
+        expenseToUpdate.paidAt = new Date().toISOString();
+      } else {
+        expenseToUpdate.status = 'pending';
+        expenseToUpdate.paidAt = null;
+      }
+      console.log(`[DEBUG - handleTogglePaidStatus]: Atualizando parcela ${expenseToUpdate.installmentNumber} para status: ${expenseToUpdate.status}`);
     } else {
-      expenseToUpdate.status = 'pending';
-      expenseToUpdate.paidAt = null; // Remove a data de pagamento se for marcada como pendente
+      // Para despesas normais (débito), mantém a lógica original
+      if (expenseToUpdate.status === 'pending') {
+        expenseToUpdate.status = 'paid';
+        expenseToUpdate.paidAt = new Date().toISOString();
+      } else {
+        expenseToUpdate.status = 'pending';
+        expenseToUpdate.paidAt = null;
+      }
     }
 
     updatedExpenses[expenseIndex] = expenseToUpdate;
@@ -549,6 +700,35 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       Alert.alert('Erro', 'Ocorreu um erro ao atualizar o status da despesa. Tente novamente.');
     }
   }, [allExpenses]);
+
+  /**
+   * Retorna o texto de status formatado para uma despesa.
+   * Considera se a despesa está paga, pendente, vencendo ou atrasada.
+   * @param {object} expense - O objeto de despesa.
+   * @returns {string} O texto de status formatado.
+   */
+  const getStatusText = (expense) => {
+    if (expense.status === 'paid') {
+      return 'Pago';
+    } else {
+      const dueDate = parseDateString(formatDateForDisplay(new Date(expense.dueDate))); // Converte para Date e zera hora para comparação
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Zera horas, minutos, segundos e milissegundos para comparação de datas
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1); // Calcula a data de amanhã
+
+      if (dueDate.getTime() === today.getTime()) {
+        return `Vence Hoje: ${formatDateForDisplay(new Date(expense.dueDate))}`;
+      } else if (dueDate.getTime() === tomorrow.getTime()) {
+        return `Vence Amanhã: ${formatDateForDisplay(new Date(expense.dueDate))}`;
+      } else if (dueDate < today) {
+        return `Atrasado: ${formatDateForDisplay(new Date(expense.dueDate))}`;
+      } else {
+        return `Vence: ${formatDateForDisplay(new Date(expense.dueDate))}`;
+      }
+    }
+  };
 
 
   /**
@@ -574,12 +754,10 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         ]}>
           <Text style={styles.sectionTitle}>{String(monthName)} {String(year)}</Text>
 
-          {/* Cabeçalho da tabela de despesas */}
+          {/* Cabeçalho da tabela de despesas - AGORA COM APENAS DESCRIÇÃO E VALOR */}
           <View style={styles.tableHeader}>
-            {/* Coluna vazia para o checkbox */}
             <View style={styles.checkboxHeaderColumn}></View> 
-            <Text style={[styles.headerText, styles.descriptionColumn]}>Despesa</Text>
-            <Text style={[styles.headerText, styles.dateColumn]}>Status/Vencimento</Text> 
+            <Text style={[styles.headerText, styles.descriptionColumnAdjusted]}>Despesa</Text>
             <Text style={[styles.headerText, styles.valueColumn]}>Valor</Text>
           </View>
 
@@ -588,11 +766,12 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
               {expenses.map((item) => (
                 <TouchableOpacity 
                   key={String(item.id)} 
-                  style={styles.debitItemRow}
-                  onPress={() => handleEditExpense(item)}
+                  style={styles.debitItemRowAdjusted} // Estilo ajustado para espaçamento vertical
+                  onLongPress={() => handleEditExpense(item)} // AGORA USA ONLONGPRESS PARA EDITAR
+                  activeOpacity={0.7} // Adiciona um feedback visual no toque
                 >
-                  {/* Checkbox para marcar/desmarcar despesa como paga */}
-                  <TouchableOpacity onPress={() => handleTogglePaidStatus(item.id)} style={styles.checkboxContainer}>
+                  {/* Checkbox para marcar/desmarcar despesa como paga (ainda com onPress) */}
+                  <TouchableOpacity onPress={() => handleTogglePaidStatus(item.id)} style={styles.checkboxContainerAdjusted}>
                     <Ionicons
                       name={item.status === 'paid' ? 'checkbox' : 'square-outline'} 
                       size={24}
@@ -600,14 +779,12 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
                     />
                   </TouchableOpacity>
 
-                  <Text style={[styles.debitText, styles.descriptionColumn]}>{String(item.description)}</Text>
-                  <Text style={[styles.debitText, styles.dateColumn]}>
-                    {item.status === 'paid' ? (
-                      <Text style={commonStyles.paidStatusText}>Pago</Text> 
-                    ) : (
-                      String(formatDateForDisplay(new Date(item.dueDate)))
-                    )}
-                  </Text> 
+                  <View style={styles.descriptionAndFooterContainer}>
+                    <Text style={styles.debitText}>{String(item.description)}</Text>
+                    {/* Rodapé com Status/Vencimento */}
+                    <Text style={styles.expenseStatusFooter}>{getStatusText(item)}</Text>
+                  </View>
+
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
                   </Text>
@@ -943,7 +1120,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
               <TouchableOpacity
                 style={[commonStyles.modalButton, commonStyles.buttonClose]}
                 onPress={() => setIsMonthYearYearPickerVisible(false)}
-              >
+                >
                 <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
               </TouchableOpacity>
             </View>
@@ -1040,20 +1217,39 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
+  // ATUALIZADO: Usado para dar mais flexibilidade à descrição no cabeçalho
+  descriptionColumnAdjusted: {
+    flex: 3, 
+    textAlign: 'left',
+  },
+  // REMOVIDO: dateColumn, pois a informação está no rodapé.
+
   expensesScrollView: {
     flex: 1,
   },
-  debitItemRow: {
+  // ATUALIZADO: Estilo do item da linha para maior espaçamento
+  debitItemRowAdjusted: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 15, // Aumentado para mais "respiro" entre os itens
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    paddingHorizontal: 5,
+  },
+  // NOVO: Container para agrupar descrição e rodapé de status
+  descriptionAndFooterContainer: {
+    flex: 3, // Ocupa o espaço que a descrição e o rodapé precisam
+    justifyContent: 'center',
   },
   debitText: {
     fontSize: 16,
     color: '#555',
+    marginBottom: 2, // Pequena margem para separar da informação de status
+  },
+  // NOVO: Estilo para o rodapé de status/vencimento
+  expenseStatusFooter: {
+    fontSize: 12, // Fonte menor para o rodapé
+    color: '#666', // Cor mais suave
   },
   debitValue: {
     fontSize: 16,
@@ -1064,15 +1260,13 @@ const styles = StyleSheet.create({
   checkboxHeaderColumn: {
     width: 30, // Largura fixa para o ícone
   },
-  descriptionColumn: {
-    flex: 2,
-    textAlign: 'left',
+  // ATUALIZADO: Estilo para o container do checkbox com mais marginRight
+  checkboxContainerAdjusted: {
+    paddingRight: 15, // Aumentado o espaçamento entre checkbox e descrição
+    width: 45, // Garante que o checkbox e o espaçamento ocupem uma largura definida
+    alignItems: 'center', // Centraliza o ícone dentro do espaço
   },
-  dateColumn: {
-    flex: 2,
-    textAlign: 'center',
-  },
-  valueColumn: {
+  valueColumn: { // Mantido como estava, mas referenciado no JSX
     flex: 1.5,
     textAlign: 'right',
   },
@@ -1116,11 +1310,5 @@ const styles = StyleSheet.create({
   clearOptionsContainer: {
     width: '100%',
     marginBottom: 20,
-  },
-  // NOVO: Estilo para o container do checkbox
-  checkboxContainer: {
-    paddingRight: 10, // Espaçamento entre o checkbox e a descrição
-    width: 30, // Garante que o checkbox ocupe uma largura definida
-    alignItems: 'center', // Centraliza o ícone dentro do espaço
   },
 });

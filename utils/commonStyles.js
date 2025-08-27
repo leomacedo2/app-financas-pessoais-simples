@@ -11,6 +11,9 @@
  *
  * ATUALIZAÇÃO RECENTE: Adicionados estilos para o `Switch` de status de despesa,
  * e ajustes para `pickerLabel` para melhor espaçamento.
+ *
+ * NOVIDADE: 2025-08-26 - Adicionados estilos para o botão de exclusão de despesa
+ * e para os botões de ação dentro dos modais (`buttonDanger`).
  */
 
 import { StyleSheet } from 'react-native';
@@ -55,6 +58,20 @@ const commonStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 20,
+    shadowColor: '#000', // Sombra para dar profundidade
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  // NOVO: Estilo para o botão de exclusão
+  deleteButton: {
+    backgroundColor: '#dc3545', // Vermelho para ação de deletar
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10, // Espaçamento do botão de salvar
     shadowColor: '#000', // Sombra para dar profundidade
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -128,9 +145,10 @@ const commonStyles = StyleSheet.create({
     paddingVertical: 12, // Aumenta o padding vertical
     paddingHorizontal: 15, // Padding horizontal
     elevation: 2,
-    // Remover flex: 1 daqui, pois o containerStackedButtons vai gerenciar a largura
     alignItems: 'center',
     justifyContent: 'center',
+    // Remover flex: 1 daqui, pois o containerStackedButtons vai gerenciar a largura,
+    // ou mantê-lo se for um botão único ou em `modalActionButtonsContainer`
   },
   modalButtonStacked: { // Estilo específico para botões empilhados
     marginBottom: 10, // Espaçamento entre os botões
@@ -139,8 +157,12 @@ const commonStyles = StyleSheet.create({
   buttonEdit: {
     backgroundColor: '#2196F3', // Azul para editar
   },
-  buttonDelete: {
+  buttonDelete: { // Renomeado para buttonDanger para consistência com o DespesaScreen
     backgroundColor: '#f44336', // Vermelho para excluir
+  },
+  // NOVO: Estilo para botão de perigo (ex: excluir)
+  buttonDanger: {
+    backgroundColor: '#dc3545', // Vermelho para perigo
   },
   buttonClose: {
     backgroundColor: '#9e9e9e', // Cinza para cancelar
