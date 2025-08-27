@@ -551,9 +551,15 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
    * @param {object} expense - O objeto de despesa a ser editado.
    */
   const handleEditExpense = (expense) => {
+    // Se for uma despesa fixa, usa o ID original (sem o sufixo de mês/ano)
+    const expenseToEdit = {
+      ...expense,
+      id: expense.id.split('-')[0] // Remove o sufixo se existir
+    };
+    
     navigation.navigate('DespesaTab', {
       screen: 'DespesaScreenInternal',
-      params: { expenseToEdit: expense },
+      params: { expenseToEdit: expenseToEdit },
     });
   };
 
