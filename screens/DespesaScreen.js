@@ -2,93 +2,10 @@
 
 /**
  * @file Tela para adicionar ou editar despesas.
- * Este componente funciona como um formulário dinâmico,
+ * Este componente React Native funciona como um formulário dinâmico,
  * permitindo ao usuário registrar novas despesas ou modificar existentes.
- *
- * Fase 1.6 - Revisada: A categoria "Fixa" foi movida para ser um método de pagamento,
- * junto com "Débito" e "Crédito". A exibição de campos como         console.log("Encontradas despesas relacionadas:", relatedExpenses.length);
-        console.log("IDs das despesas encontradas:", relatedExpenses.map(exp => ({
-          id: exp.id,
-          status: exp.status,
-          paymentMethod: exp.paymentMethod
-        })));
-        
-        if (relatedExpenses.length === 0) {
-          console.log("DEBUG - Todas as despesas disponíveis:", expenses.map(exp => ({
-            id: exp.id,
-            paymentMethod: exp.paymentMethod,
-            status: exp.status
-          })));
-        }ata da Compra,
- * Cartão e Parcelas será condicional ao método de pagamento selecionado.
- *
- * Atualização: Adicionado campo "Dia do Pagamento" para despesas do tipo "Fixa",
- * permitindo especificar em que dia do mês a despesa fixa é esperada.
- *
- * NOVIDADE: Lógica para despesas de "Crédito" incluindo parcelamento e
- * ajuste de data de vencimento baseada no dia de vencimento do cartão.
- *
- * CORREÇÕES VISUAIS: Ajuste do layout para campos de crédito (rótulos e input).
- * SINCRONIZAÇÃO DE DATAS: Implementação de useFocusEffect para recarregar cartões
- * ao focar na tela, garantindo que as alterações da tela de cartões sejam refletidas.
- *
- * CORREÇÃO ERRO: Encapsulamento de strings de texto dentro de <Text> componentes foi resolvido.
- * CORREÇÃO VISUAL 2: Posicionamento do rótulo "Selecione o Cartão".
- * CORREÇÃO ATUAL: Ajuste na lógica de carregamento e seleção de cartões
- * para garantir que o Picker de cartões apareça corretamente preenchido
- * e não mostre "Nenhum cartão cadastrado" indevidamente.
- *
- * ATUALIZAÇÃO RECENTE: O campo "Dia do Pagamento" para despesas do tipo "Fixa" agora é um Picker,
- * permitindo a seleção de um dia válido (1-31) em vez de um TextInput.
- *
- * CORREÇÃO ATUAL 2: Resolvido o erro "Text strings must be rendered within a <Text> component"
- * que retornou após as últimas mudanças no Picker. A correção é feita garantindo
- * que todos os Picker.Items sejam gerados diretamente no JSX para o Picker de Despesa Fixa,
- * e a label do placeholder do Picker de Cartões seja explicitamente uma string.
- *
- * CORREÇÃO FINAL: Removido estilo direto do Picker.Item placeholder no seletor de cartões
- * para evitar interações de renderização inconsistentes em diferentes plataformas.
- *
- * CORREÇÃO URGENTE: Ajustada a lógica de `selectedCardId` para ser sempre string vazia `''`
- * em vez de `null` para maior consistência com o `Picker.Item` de placeholder e evitar
- * o erro "Text strings must be rendered within a <Text> component".
- *
- * DEBUG E CORREÇÃO "UNDEFINED": A propriedade `label` dos `Picker.Item`s de cartão agora usa `String(card.alias || '')`
- * para garantir que nunca seja `undefined` ou `null`, resolvendo o erro e a exibição de "undefined".
- *
- * CORREÇÃO CRÍTICA DO PICKER: Refatorado o placeholder do seletor de cartões.
- * O `Picker.Item` de placeholder agora é renderizado sempre como o primeiro item,
- * sem a propriedade `enabled={false}`, para evitar erros de "Text strings must be rendered within a <Text> component"
- * que podem surgir de comportamentos inconsistentes do `Picker` com itens desabilitados ou `value`s específicos.
- *
- * REVERSÃO DO PICKER DE DIA FIXO: O `@react-native-picker/picker` para o "Dia do Pagamento (1-31)"
- * e o modal customizado foram removidos. O campo de seleção de dia voltou a ser um TextInput simples.
- *
- * CORREÇÃO DE DATAS CRÍTICA (Fase 1.7): Lógica de cálculo de `dueDate` para despesas de crédito e fixas
- * foi revista e aprimorada para garantir que o dia de vencimento seja corretamente ajustado
- * para o último dia do mês quando o dia configurado (ex: 31) não existir no mês em questão.
- * Isso resolve os problemas de parcelas "saltando" para o próximo mês ou exibindo datas erradas.
- *
- * ATUALIZAÇÃO 23/08/2025: Reintrodução do Picker para "Dia do Pagamento" em despesas fixas,
- * sem comentários JSX diretos para testar a correção do erro anterior.
- * CORREÇÃO 23/08/2025: Corrigido o erro de `useState` para `currentExpenseDeletedAt`.
- *
- * NOVA FUNCIONALIDADE: Adicionado `Switch` para marcar despesas como pagas/pendentes.
- * Isso permite editar o status de pagamento de uma despesa diretamente nesta tela.
- *
- * CORREÇÃO CRÍTICA: Lógica de reset da tela para "Adicionar Nova Despesa" ao focar,
- * se nenhum parâmetro `expenseToEdit` for passado, garantindo que a tela não persista
- * o estado de edição anterior.
- *
- * CORREÇÃO DE LOOP E PERSISTÊNCIA: Ajustada a dependência da `useCallback` de `loadCards`
- * e adicionado `navigation.setParams({ expenseToEdit: undefined });` para limpar os parâmetros da rota.
- *
- * NOVIDADE: 2025-08-26 - Implementada funcionalidade de Exclusão Suave (Soft Delete)
- * de despesas.
- * - Adicionado um botão "Excluir Despesa" na tela de edição.
- * - Ao excluir, a despesa é marcada como `status: 'inactive'` e recebe um `deletedAt` timestamp
- * no AsyncStorage, em vez de ser removida permanentemente.
- * - Um modal de confirmação foi adicionado para evitar exclusões acidentais.
+ * Ele gerencia despesas de Débito, Crédito (com parcelamento) e Fixas,
+ * com lógica de data inteligente e funcionalidade de exclusão suave.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -102,7 +19,7 @@ import { Picker } from '@react-native-picker/picker';
 import commonStyles from '../utils/commonStyles';
 import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 
-// Importa useFocusEffect
+// Importa useFocusEffect para reagir ao foco da tela (navegação)
 import { useFocusEffect } from '@react-navigation/native';
 
 /**
@@ -180,11 +97,13 @@ const getNextInstallmentDueDate = (previousDueDate, cardDueDayOfMonth) => {
 export default function DespesaScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
 
+  // Estados para os campos do formulário de despesas
   const [expenseName, setExpenseName] = useState('');
   const [expenseValue, setExpenseValue] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date());
   const [paymentMethod, setPaymentMethod] = useState('Débito');
   
+  // Estados para gerenciamento de cartões de crédito e parcelas
   const [cards, setCards] = useState([]);
   const [selectedCardId, setSelectedCardId] = useState('');
   const [numInstallments, setNumInstallments] = useState('1');
@@ -192,18 +111,22 @@ export default function DespesaScreen({ navigation, route }) {
   // Estado para o dia de vencimento de despesas fixas
   const [fixedExpenseDueDay, setFixedExpenseDueDay] = useState('1');
 
+  // Estados de UI e controle
   const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
-  const [savingExpense, setSavingExpense] = useState(false);
+  const [savingExpense, setSavingExpense] = useState(false); // Indicador de carregamento/salvamento
 
+  // Estados para controle de edição de despesas
   const [isEditing, setIsEditing] = useState(false);
-  const [currentExpenseId, setCurrentExpenseId] = useState(null);
-  const [currentExpenseDeletedAt, setCurrentExpenseDeletedAt] = useState(null);
+  const [currentExpenseId, setCurrentExpenseId] = useState(null); // ID da despesa sendo editada (baseId para crédito)
+  const [currentExpenseDeletedAt, setCurrentExpenseDeletedAt] = useState(null); // Timestamp se a despesa foi excluída suavemente
   
-  const [showDeleteModal, setShowDeleteModal] = useState(false); // Estado para o modal de exclusão
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // Estado para o modal de confirmação de exclusão
+  const [isInstallmentsEditable, setIsInstallmentsEditable] = useState(true); // Controla se o campo de parcelas pode ser editado
 
-  const [isInstallmentsEditable, setIsInstallmentsEditable] = useState(true);
-
-  // Carrega os cartões ativos do AsyncStorage para exibição no Picker
+  /**
+   * Carrega os cartões ativos do AsyncStorage para exibição no Picker.
+   * Seleciona o primeiro cartão ativo ou mantém o `selectedCardId` se ainda for válido.
+   */
   const loadCards = useCallback(async () => {
     try {
       const storedCardsJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.CARDS);
@@ -213,33 +136,36 @@ export default function DespesaScreen({ navigation, route }) {
       
       console.log("DespesaScreen: Cartões ativos carregados:", activeCards.map(c => ({id: c.id, alias: c.alias, dueDayOfMonth: c.dueDayOfMonth})));
 
-      // Logic to set/update selectedCardId
       setSelectedCardId(prevSelectedCardId => {
-        if (activeCards.length > 0) {
-          if (prevSelectedCardId && activeCards.some(card => card.id === prevSelectedCardId)) {
-            return prevSelectedCardId;
-          } else {
-            return activeCards[0].id;
-          }
+        // Se já existe um cartão selecionado e ele ainda é ativo, mantém.
+        if (prevSelectedCardId && activeCards.some(card => card.id === prevSelectedCardId)) {
+          return prevSelectedCardId;
+        } else if (activeCards.length > 0) {
+          // Caso contrário, seleciona o primeiro cartão ativo.
+          return activeCards[0].id;
         } else {
+          // Se não há cartões ativos, limpa a seleção.
           return '';
         }
       });
     } catch (error) {
       console.error("DespesaScreen: Erro ao carregar cartões do AsyncStorage:", error);
     }
-  }, []);
+  }, []); // Dependências vazias para que `loadCards` não mude e cause loops indesejados
 
-  // useFocusEffect para inicializar/resetar a tela ao focar
+  /**
+   * Hook para inicializar/resetar o estado da tela ao focar nela (navegação).
+   * Popula o formulário se `expenseToEdit` for passado via `route.params`.
+   */
   useFocusEffect(
     useCallback(() => {
-      loadCards();
+      loadCards(); // Recarrega os cartões sempre que a tela ganha foco
 
       if (route.params?.expenseToEdit) {
+        // Modo de edição: preenche o formulário com os dados da despesa
         const expense = route.params.expenseToEdit;
-        // Extrai o ID base (removendo sufixos de parcela ou mês/ano)
-        const baseId = expense.originalExpenseId || expense.id.split('-')[0];
-        
+        const baseId = expense.originalExpenseId || expense.id.split('-')[0]; // Obtém o ID base
+
         console.log('Recebendo despesa para edição:', {
           id: expense.id,
           baseId,
@@ -248,10 +174,10 @@ export default function DespesaScreen({ navigation, route }) {
         });
         
         setIsEditing(true);
-        setCurrentExpenseId(baseId); // Usa o ID base
+        setCurrentExpenseId(baseId);
         setExpenseName(expense.description);
         
-        // Para despesas de crédito, calcula o valor total
+        // Ajusta o valor para despesas de crédito (exibe o total se for parcelado)
         if (expense.paymentMethod === 'Crédito') {
           const valorTotal = expense.value * (expense.totalInstallments || 1);
           setExpenseValue(valorTotal.toFixed(2).replace('.', ','));
@@ -260,26 +186,28 @@ export default function DespesaScreen({ navigation, route }) {
         }
 
         setPaymentMethod(expense.paymentMethod || 'Débito');
-        setIsInstallmentsEditable(true); // Sempre permite editar parcelas
+        setIsInstallmentsEditable(true); // Permite editar parcelas em modo de edição
 
+        // Define estados específicos para cada método de pagamento
         if (expense.paymentMethod === 'Débito') {
           setPurchaseDate(new Date(expense.purchaseDate || expense.createdAt));
-          setFixedExpenseDueDay('1');
+          setFixedExpenseDueDay('1'); // Reseta para o padrão
         } else if (expense.paymentMethod === 'Crédito') {
           setPurchaseDate(new Date(expense.purchaseDate || expense.createdAt));
           setSelectedCardId(expense.cardId || '');
-          setNumInstallments(String(expense.totalInstallments || '1')); // Garante que seja string
-          setFixedExpenseDueDay('1');
+          setNumInstallments(String(expense.totalInstallments || '1'));
+          setFixedExpenseDueDay('1'); // Reseta para o padrão
         } else if (expense.paymentMethod === 'Fixa') {
-          setPurchaseDate(new Date());
-          setSelectedCardId('');
-          setNumInstallments('1');
+          setPurchaseDate(new Date()); // Data atual como padrão
+          setSelectedCardId(''); // Limpa seleção de cartão
+          setNumInstallments('1'); // Reseta para o padrão
           setFixedExpenseDueDay(String(expense.dueDayOfMonth || '1'));
         }
 
         setCurrentExpenseDeletedAt(expense.deletedAt || null);
 
       } else {
+        // Modo de adição: reseta o formulário para um novo item
         setIsEditing(false);
         setCurrentExpenseId(null);
         setExpenseName('');
@@ -293,26 +221,34 @@ export default function DespesaScreen({ navigation, route }) {
         setIsInstallmentsEditable(true);
       }
 
+      // Limpa os parâmetros da rota ao sair para evitar que a tela entre em modo de edição novamente
       return () => {
         navigation.setParams({ expenseToEdit: undefined });
       };
     }, [navigation, route.params?.expenseToEdit, loadCards])
   );
 
-  // Handler para mudança de data no DateTimePicker
+  /**
+   * Handler para a mudança de data no DateTimePicker.
+   * @param {object} event - O evento do DateTimePicker.
+   * @param {Date} selectedDate - A data selecionada.
+   */
   const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(Platform.OS === 'ios');
+    setShowDatePicker(Platform.OS === 'ios'); // Fecha o picker no iOS após seleção
     if (selectedDate) {
       setPurchaseDate(selectedDate);
     }
   };
 
-  // Exibe o DateTimePicker
+  /** Exibe o DateTimePicker. */
   const showDatepicker = () => {
     setShowDatePicker(true);
   };
 
-  // Handler para salvar/atualizar a despesa
+  /**
+   * Handler principal para salvar ou atualizar uma despesa.
+   * Realiza validações e persistência dos dados no AsyncStorage.
+   */
   const handleSaveExpense = async () => {
     console.log('Estado atual ao salvar:', {
       isEditing,
@@ -321,6 +257,7 @@ export default function DespesaScreen({ navigation, route }) {
       expenseName: expenseName.trim()
     });
 
+    // --- Validações Comuns ---
     if (!expenseName.trim() || !expenseValue.trim()) {
       Alert.alert('Erro', 'Por favor, preencha a descrição e o valor da despesa.');
       return;
@@ -331,7 +268,7 @@ export default function DespesaScreen({ navigation, route }) {
       return;
     }
 
-    // Validações específicas para despesas de crédito
+    // --- Validações Específicas para Crédito ---
     if (paymentMethod === 'Crédito') {
       if (!selectedCardId) {
         Alert.alert('Erro', 'Por favor, selecione um cartão para despesas de crédito.');
@@ -344,7 +281,7 @@ export default function DespesaScreen({ navigation, route }) {
       }
     }
 
-    // Validações específicas para despesas fixas
+    // --- Validações Específicas para Fixa ---
     if (paymentMethod === 'Fixa') {
       const day = parseInt(fixedExpenseDueDay, 10);
       if (isNaN(day) || day < 1 || day > 31) {
@@ -353,7 +290,7 @@ export default function DespesaScreen({ navigation, route }) {
       }
     }
 
-    setSavingExpense(true);
+    setSavingExpense(true); // Inicia o indicador de carregamento
 
     try {
       const existingExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
@@ -363,30 +300,27 @@ export default function DespesaScreen({ navigation, route }) {
       let expenseDataTemplate = {
         description: expenseName.trim(),
         value: value,
-        paymentMethod: isEditing ? route.params?.expenseToEdit?.paymentMethod : paymentMethod,
+        paymentMethod: isEditing ? route.params?.expenseToEdit?.paymentMethod : paymentMethod, // Mantém o método original em edição
         deletedAt: currentExpenseDeletedAt,
       };
 
-      // Lógica para edição de despesa existente
+      // --- Lógica para Edição de Despesa Existente ---
       if (isEditing && currentExpenseId) {
-        // Encontra a despesa específica para editar
         const expenseToEdit = route.params?.expenseToEdit;
         
         console.log("DEBUG - Dados da despesa para edição:", expenseToEdit);
         
-        // Se não temos uma despesa para editar, não continua
         if (!expenseToEdit) {
           console.warn("Nenhuma despesa para editar encontrada nos parâmetros da rota");
           return;
         }
 
-        // Lógica para edição de despesa de crédito
+        // --- Edição de Despesa de Crédito ---
         if (paymentMethod === 'Crédito') {
             const novoNumParcelas = parseInt(numInstallments, 10);
             const valorParcela = value / novoNumParcelas;
             const now = new Date().toISOString();
 
-            // Encontra o cartão de crédito selecionado para obter o dia de vencimento
             const selectedCard = cards.find(card => card.id === selectedCardId);
             if (!selectedCard) {
                 Alert.alert('Erro', 'Cartão selecionado não encontrado. Por favor, tente novamente.');
@@ -395,16 +329,16 @@ export default function DespesaScreen({ navigation, route }) {
             }
             const dueDayOfMonthCard = selectedCard.dueDayOfMonth;
 
-            // Remove todas as parcelas antigas desta despesa do array
+            // Remove todas as parcelas antigas desta despesa (usando originalExpenseId)
             expenses = expenses.filter(e => e.originalExpenseId !== expenseToEdit.originalExpenseId);
             
-            // Corrige o bug: usa a nova `purchaseDate` do estado para o recalculo
+            // Recalcula a primeira data de vencimento com base na `purchaseDate` do estado atual
             let currentDueDate = getFirstCreditDueDate(purchaseDate, dueDayOfMonthCard);
 
             // Cria novas parcelas com o número correto e as datas de vencimento ajustadas
             for (let i = 1; i <= novoNumParcelas; i++) {
                 const novaParcela = {
-                    id: `${expenseToEdit.originalExpenseId}-${i}`,
+                    id: `${expenseToEdit.originalExpenseId}-${i}`, // Mantém o ID base original
                     description: expenseName.trim(),
                     value: valorParcela,
                     paymentMethod: 'Crédito',
@@ -414,7 +348,7 @@ export default function DespesaScreen({ navigation, route }) {
                     installmentNumber: i,
                     totalInstallments: novoNumParcelas,
                     originalExpenseId: expenseToEdit.originalExpenseId,
-                    createdAt: expenseToEdit.createdAt,
+                    createdAt: expenseToEdit.createdAt, // Mantém o createdAt original
                     modifiedAt: now,
                     status: 'pending', // Assume novas parcelas como pendentes
                     paidAt: null
@@ -429,7 +363,7 @@ export default function DespesaScreen({ navigation, route }) {
             Alert.alert('Sucesso', 'Despesa de crédito atualizada com sucesso!');
 
         } else {
-            // Lógica de edição para Débito e Fixa (mantida como estava)
+            // --- Edição de Despesa de Débito e Fixa (atualiza a despesa única) ---
             const expenseToUpdate = expenses.find(exp => exp.id === currentExpenseId);
             if (expenseToUpdate) {
                 const now = new Date().toISOString();
@@ -443,6 +377,7 @@ export default function DespesaScreen({ navigation, route }) {
                 if (paymentMethod === 'Débito') {
                     updatedExpense.purchaseDate = purchaseDate.toISOString();
                     updatedExpense.dueDate = purchaseDate.toISOString();
+                    // Limpa campos específicos de crédito/fixa
                     delete updatedExpense.cardId;
                     delete updatedExpense.installmentNumber;
                     delete updatedExpense.totalInstallments;
@@ -457,6 +392,7 @@ export default function DespesaScreen({ navigation, route }) {
                         dayForFixedExpense = lastDayOfCurrentMonth;
                     }
                     updatedExpense.dueDayOfMonth = dayForFixedExpense;
+                    // Limpa campos específicos de débito/crédito
                     delete updatedExpense.purchaseDate;
                     delete updatedExpense.cardId;
                     delete updatedExpense.installmentNumber;
@@ -464,6 +400,7 @@ export default function DespesaScreen({ navigation, route }) {
                     delete updatedExpense.originalExpenseId;
                     delete updatedExpense.dueDate;
                 }
+                // Encontra e atualiza a despesa no array
                 const index = expenses.findIndex(e => e.id === currentExpenseId);
                 if (index !== -1) {
                     expenses[index] = updatedExpense;
@@ -472,13 +409,13 @@ export default function DespesaScreen({ navigation, route }) {
             Alert.alert('Sucesso', 'Despesa atualizada com sucesso!');
         }
         
-        // Salva as alterações no AsyncStorage
+        // Salva todas as alterações no AsyncStorage
         try {
           await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
           await AsyncStorage.setItem('LAST_UPDATE', new Date().toISOString());
           navigation.navigate('Home', {
             refresh: true,
-            timestamp: Date.now()
+            timestamp: Date.now() // Força um refresh na tela Home
           });
         } catch (error) {
           console.error("DespesaScreen: Erro ao salvar despesa no AsyncStorage:", error);
@@ -486,15 +423,15 @@ export default function DespesaScreen({ navigation, route }) {
         }
 
       } else {
-        // Lógica para adicionar nova despesa
-        expenseDataTemplate.createdAt = new Date().toISOString();
+        // --- Lógica para Adicionar Nova Despesa ---
+        expenseDataTemplate.createdAt = new Date().toISOString(); // Define o timestamp de criação
 
         if (paymentMethod === 'Débito') {
           const newExpense = {
             ...expenseDataTemplate,
-            id: Date.now().toString(),
+            id: Date.now().toString(), // ID único
             purchaseDate: purchaseDate.toISOString(),
-            dueDate: purchaseDate.toISOString(),
+            dueDate: purchaseDate.toISOString(), // Para débito, data de compra = data de vencimento
           };
           expenses.push(newExpense);
           Alert.alert('Sucesso', 'Despesa de débito adicionada com sucesso!');
@@ -503,7 +440,7 @@ export default function DespesaScreen({ navigation, route }) {
         } else if (paymentMethod === 'Crédito') {
           const totalNumInstallments = parseInt(numInstallments, 10);
           const installmentValue = value / totalNumInstallments;
-          const originalExpenseUniqueId = Date.now().toString();
+          const originalExpenseUniqueId = Date.now().toString(); // ID base para todas as parcelas
 
           const selectedCreditCard = cards.find(card => card.id === selectedCardId);
           if (!selectedCreditCard) {
@@ -513,12 +450,13 @@ export default function DespesaScreen({ navigation, route }) {
           }
           const dueDayOfMonthCard = selectedCreditCard.dueDayOfMonth;
 
+          // Calcula a primeira data de vencimento da parcela
           let currentDueDate = getFirstCreditDueDate(purchaseDate, dueDayOfMonthCard);
 
           for (let i = 1; i <= totalNumInstallments; i++) {
             const installmentData = {
               ...expenseDataTemplate,
-              id: `${originalExpenseUniqueId}-${i}`,
+              id: `${originalExpenseUniqueId}-${i}`, // ID da parcela
               value: installmentValue,
               paymentMethod: 'Crédito',
               cardId: selectedCardId,
@@ -531,6 +469,7 @@ export default function DespesaScreen({ navigation, route }) {
             };
             expenses.push(installmentData);
             if (i < totalNumInstallments) {
+                // Calcula a data da próxima parcela
                 currentDueDate = getNextInstallmentDueDate(currentDueDate, dueDayOfMonthCard);
             }
           }
@@ -549,7 +488,7 @@ export default function DespesaScreen({ navigation, route }) {
             ...expenseDataTemplate,
             id: Date.now().toString(),
             status: 'pending', // Novas despesas fixas são pendentes por padrão
-            dueDayOfMonth: dayForFixedExpense,
+            dueDayOfMonth: dayForFixedExpense, // Dia de vencimento fixo mensal
           };
           expenses.push(newExpense);
           Alert.alert('Sucesso', 'Despesa fixa adicionada com sucesso!');
@@ -557,9 +496,10 @@ export default function DespesaScreen({ navigation, route }) {
         }
       }
 
-      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(expenses)); // Persiste no AsyncStorage
+      await AsyncStorage.setItem('LAST_UPDATE', new Date().toISOString()); // Atualiza o timestamp de última modificação
       
-      // Reseta o formulário após salvar
+      // Reseta o formulário após salvar com sucesso
       setExpenseName('');
       setExpenseValue('');
       setPaymentMethod('Débito');
@@ -573,20 +513,21 @@ export default function DespesaScreen({ navigation, route }) {
       setIsInstallmentsEditable(true);
 
       setTimeout(() => {
-        navigation.goBack(); 
+        navigation.goBack(); // Volta para a tela anterior
       }, 100);
 
     } catch (error) {
       console.error("DespesaScreen: Erro ao salvar despesa no AsyncStorage:", error);
       Alert.alert('Erro', `Ocorreu um erro ao salvar a despesa: ${error.message}. Tente novamente.`);
     } finally {
-      setSavingExpense(false);
+      setSavingExpense(false); // Finaliza o indicador de carregamento
     }
   };
 
   /**
    * Função para lidar com a exclusão suave (soft delete) de uma despesa.
    * Marca a despesa como inativa e adiciona um timestamp de exclusão.
+   * Para despesas de crédito, inativa todas as parcelas relacionadas.
    */
   const handleDeleteExpense = async () => {
     if (!currentExpenseId) {
@@ -594,23 +535,22 @@ export default function DespesaScreen({ navigation, route }) {
       return;
     }
 
-    setSavingExpense(true); // Usar o mesmo indicador de loading
+    setSavingExpense(true); // Usa o mesmo indicador de loading para exclusão
     setShowDeleteModal(false); // Fecha o modal de confirmação
 
     try {
-      // Extrai o ID base (removendo qualquer sufixo)
-      const baseId = currentExpenseId.split('-')[0];
+      const baseId = currentExpenseId.split('-')[0]; // Extrai o ID base
       console.log('Tentando excluir despesa - ID base:', baseId, 'ID completo:', currentExpenseId);
       
       let expenses = JSON.parse(await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES)) || [];
       console.log('Total de despesas encontradas:', expenses.length);
       console.log('IDs das despesas disponíveis:', expenses.map(e => e.id));
       
-      // Procura a despesa original ou qualquer parcela relacionada
+      // Encontra a despesa original ou qualquer parcela relacionada para determinar o tipo
       const currentExpense = expenses.find(exp => 
-        exp.id === baseId || // ID exato
-        exp.id.startsWith(baseId + '-') || // Parcela de crédito
-        exp.originalExpenseId === baseId // Referência à despesa original
+        exp.id === baseId || 
+        exp.id.startsWith(baseId + '-') || 
+        exp.originalExpenseId === baseId
       );
       
       if (!currentExpense) {
@@ -618,32 +558,28 @@ export default function DespesaScreen({ navigation, route }) {
         throw new Error('Despesa não encontrada.');
       }
 
-      console.log('Excluindo despesa:', currentExpense); // Log para debug
+      console.log('Excluindo despesa:', currentExpense);
       
       const updatedExpenses = expenses.map(exp => {
-        // Para despesas de crédito, verifica se é parte do mesmo conjunto de parcelas
-        const baseId = currentExpenseId.split('-')[0];
+        // Se for despesa de Crédito, marca todas as parcelas com o mesmo `originalExpenseId` como inativas
         if (currentExpense.paymentMethod === 'Crédito' && 
-            (exp.id === baseId || // ID base
-             exp.id.startsWith(baseId + '-') || // Parcelas relacionadas
-             exp.originalExpenseId === baseId || // Referência à despesa original
-             (currentExpense.originalExpenseId && exp.originalExpenseId === currentExpense.originalExpenseId))) {
+            (exp.id.startsWith(baseId + '-') || exp.originalExpenseId === baseId)) {
           return {
             ...exp,
             status: 'inactive',
             deletedAt: new Date().toISOString(),
           };
         } 
-        // Para despesas fixas ou de débito, marca apenas a despesa específica
+        // Para despesas Fixas ou de Débito, marca apenas a despesa específica como inativa
         else if (exp.id === currentExpenseId) {
           console.log('Marcando despesa como inativa:', {
             id: exp.id,
             tipo: exp.paymentMethod,
             descricao: exp.description
-          }); // Log para debug
+          });
           
           if (exp.paymentMethod === 'Fixa') {
-            // Para despesas fixas, adiciona um array de meses excluídos se ainda não existir
+            // Para despesas fixas, pode-se adicionar lógica futura para meses excluídos
             return {
               ...exp,
               status: 'inactive',
@@ -658,7 +594,7 @@ export default function DespesaScreen({ navigation, route }) {
             deletedAt: new Date().toISOString(),
           };
         }
-        return exp;
+        return exp; // Retorna despesas inalteradas
       });
 
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses));
@@ -668,10 +604,11 @@ export default function DespesaScreen({ navigation, route }) {
       console.error('Erro ao excluir despesa:', error);
       Alert.alert('Erro', 'Ocorreu um erro ao excluir a despesa. Tente novamente.');
     } finally {
-      setSavingExpense(false);
+      setSavingExpense(false); // Finaliza o indicador de carregamento
     }
   };
 
+  // Array de dias do mês para o Picker de despesas fixas
   const daysInMonth = Array.from({ length: 31 }, (_, i) => String(i + 1));
 
   return (
@@ -698,7 +635,7 @@ export default function DespesaScreen({ navigation, route }) {
         <View style={commonStyles.typeSelectionContainer}>
           <Text style={commonStyles.pickerLabel}>Método de Pagamento:</Text>
           {isEditing ? (
-            // Quando estiver editando, apenas mostra o método atual
+            // Em modo de edição, apenas exibe o método atual (não editável)
             <View style={[commonStyles.typeButtonsWrapper, { opacity: 0.7 }]}>
               <View style={[commonStyles.typeButton, commonStyles.typeButtonSelected]}>
                 <Text style={[commonStyles.typeButtonText, commonStyles.typeButtonTextSelected]}>
@@ -707,7 +644,7 @@ export default function DespesaScreen({ navigation, route }) {
               </View>
             </View>
           ) : (
-            // Quando estiver criando, permite selecionar o método
+            // Em modo de adição, permite selecionar o método de pagamento
             <View style={commonStyles.typeButtonsWrapper}>
               <TouchableOpacity
                 style={[
@@ -751,7 +688,7 @@ export default function DespesaScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* Campos de Data da Compra (para Débito e Crédito) */}
+        {/* Campos de Data da Compra (exibidos para Débito e Crédito) */}
         {(paymentMethod === 'Débito' || paymentMethod === 'Crédito') && (
           <>
             <View style={commonStyles.datePickerSection}>
@@ -774,10 +711,11 @@ export default function DespesaScreen({ navigation, route }) {
           </>
         )}
 
-        {/* Campos específicos para Crédito */}
+        {/* Campos específicos para Despesas de Crédito */}
         {paymentMethod === 'Crédito' && (
           <View style={styles.creditOptionsContainer}>
             {cards.length > 0 ? (
+              // Se há cartões cadastrados, exibe o seletor de cartão e o input de parcelas
               <>
                 <View style={commonStyles.pickerContainer}>
                   <Text style={commonStyles.pickerLabel}>Selecione o Cartão:</Text>
@@ -898,6 +836,7 @@ export default function DespesaScreen({ navigation, route }) {
   );
 }
 
+// --- Estilos da Tela ---
 const styles = StyleSheet.create({
   container: {
     ...commonStyles.container,
