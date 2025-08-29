@@ -265,7 +265,8 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
             dueDate: fixedDueDate.toISOString(),
             id: `${item.id}-${targetYear}-${targetMonth}`,
             originalId: item.id,
-            description: `${item.description}`,
+            // A descrição da despesa fixa **NÃO** é ajustada aqui para evitar duplicação de "(Fixa)"
+            description: item.description, 
             // Usa o status específico do mês se existir, senão usa 'pending'
             status: monthStatus?.status || 'pending',
             paidAt: monthStatus?.paidAt || null
@@ -508,6 +509,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     
     allIncomes.forEach(income => {
       // Ignora receitas fixas que foram excluídas para este mês específico
+      // TODO: Considerar se receitas fixas deveriam ser marcadas com (Fixa) também.
       if (income.type === 'Fixo' && income.excludedMonths && income.excludedMonths.includes(currentMonthYearString)) {
         return;
       }
@@ -780,7 +782,10 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
                   </TouchableOpacity>
 
                   <View style={styles.descriptionAndFooterContainer}>
-                    <Text style={styles.debitText}>{String(item.description)}</Text>
+                    <Text style={styles.debitText}>
+                      {String(item.description)}
+                      {item.paymentMethod === 'Fixa' && " (Fixa)"} {/* Adiciona "(Fixa)" se for despesa fixa */}
+                    </Text>
                     {/* Rodapé com Status/Vencimento */}
                     <Text style={styles.expenseStatusFooter}>{getStatusText(item)}</Text>
                   </View>
@@ -841,7 +846,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
           Alert.alert('Sucesso', 'Todas as despesas foram limpas permanentemente.');
           break;
         case '3':
-          await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.CARDS);
+          await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.CARDS); // CORRIGIDO: ASYNC_STORAGE_KEYS
           Alert.alert('Sucesso', 'Todos os cartões foram limpos permanentemente.');
           break;
         case '4':
@@ -912,7 +917,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         }
         return expense;
       });
-      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses));
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses)); // CORRIGIDO: ASYNC_STORAGE_KEYS
 
       Alert.alert('Sucesso', `Dados do mês ${getMonthName(targetDateToClear)}/${yearToClear} marcados como inativos.`);
       await loadData(); // Recarrega os dados para refletir as mudanças
