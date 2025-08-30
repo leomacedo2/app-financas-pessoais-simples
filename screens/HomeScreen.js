@@ -2,45 +2,17 @@
 
 /**
  * @file HomeScreen.js
- * @description Esta tela é a principal do aplicativo, exibindo um resumo financeiro
- * e uma lista horizontal rolável de despesas por mês.
+ * @description Esta tela é a principal do aplicativo. Ela exibe um resumo financeiro do mês atual,
+ * uma lista horizontal paginada de despesas por mês (passados e futuros),
+ * e funcionalidades para adicionar/editar despesas, gerar dados de teste e limpar informações.
  *
- * Funcionalidades principais:
- * - Exibição paginada de despesas para meses passados e futuros.
- * - Cálculo e exibição da receita total e valor final para o mês visível.
- * - Geração de despesas aleatórias para TODOS os meses no range.
- * - O mês atual do sistema é SEMPRE exibido na FlatList e a rolagem inicial vai para ele.
- * - Sincronização de dados de receitas e despesas com AsyncStorage.
- * - Modal aprimorado para limpeza de dados, permitindo a seleção de Mês/Ano para exclusão suave.
- *
- * Atualizações:
- * - 2025-08-26 (NOVIDADE): Adicionado o status "Vence Amanhã" na função `getStatusText`
- * para despesas pendentes que vencem no dia seguinte.
- * - 2025-08-26 (NOVIDADE): Implementada a funcionalidade de "Toque Longo" para editar despesas.
- * - Agora, um *toque longo* em um item da lista de despesas navegará para a tela de edição.
- * - O *toque simples* na checkbox continua a alternar o status de pago/pendente,
- * eliminando o "miss click" que ocorria ao tentar marcar/desmarcar a despesa.
- * - 2025-08-26 (CORRIGIDO): Correção do erro de digitação `ASYC_STORAGE_KEYS` para `ASYNC_STORAGE_KEYS`
- * na função `handleGenerateRandomExpenses` (linha 420).
- * - 2025-08-26 (CORRIGIDO): Revisão de todos os componentes `<Text>` para garantir que apenas strings
- * ou variáveis de string sejam passadas como filhos, evitando comentários JSX internos
- * que podem causar o aviso "Text strings must be rendered within a <Text> component".
- * - 2025-08-26 (REVISADO): Refatoração do layout da lista de despesas na HomeScreen.
- * - A coluna "Status/Vencimento" foi removida do cabeçalho da lista de despesas.
- * - As informações de status (Pago/Pendente/Atrasado/Vence) foram movidas para um "rodapézinho"
- * abaixo da descrição da despesa, utilizando uma fonte menor e cor mais discreta (`expenseStatusFooter`).
- * - O `marginRight` do `checkboxContainer` foi aumentado e o `paddingVertical` dos itens da lista
- * (`debitItemRow`) foi ajustado para melhorar o espaçamento e a área de toque, prevenindo cliques acidentais
- * e proporcionando mais "respiro" visual entre os itens.
- * - A função `getStatusText` foi aprimorada para incluir o status "Atrasado" quando aplicável.
- * - 2024-08-15: RESOLVIDO DEFINITIVAMENTE: Flicker de Rolagem (Agosto 2024 -> Agosto 2025).
- * - A lógica de inicialização da rolagem foi **completamente reestruturada**.
- * - Agora, o `currentMonthIndex` (que serve como `initialScrollIndex` da `FlatList`)
- * é calculado e atualizado *dentro do `loadData`*, logo após o carregamento dos dados
- * e a estabilização da lista de meses filtrados (`filteredMonthsToDisplay`).
- * - Isso garante que a `FlatList` já renderize no mês correto (Agosto de 2025) desde
- * a sua primeira aparição após o `loading` ser definido como `false`.
- * - 2024-08-10: Implementação inicial da `HomeScreen` com exibição de despesas e resumo.
+ * Principais funcionalidades:
+ * - Exibição paginada de despesas e receitas por mês, permitindo navegar entre eles.
+ * - Cálculo e exibição da receita total e valor final para o mês atualmente visível.
+ * - Gerenciamento de despesas de Débito, Crédito (com parcelamento) e Fixas, incluindo status de pago/pendente.
+ * - Suporte a toque longo para edição de despesas e toque simples para alternar status de pagamento.
+ * - Sincronização e persistência de dados de receitas, despesas e cartões com AsyncStorage.
+ * - Modais para geração de despesas aleatórias e limpeza de dados (geral ou por mês específico).
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -125,13 +97,16 @@ const generateMonthsToDisplay = () => {
   const numPastMonths = 12;
   const numFutureMonths = 12;
 
+  // Adiciona meses anteriores
   for (let i = numPastMonths; i > 0; i--) {
     const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
     months.push(date);
   }
 
+  // Adiciona o mês atual
   months.push(new Date(today.getFullYear(), today.getMonth(), 1));
 
+  // Adiciona meses futuros
   for (let i = 1; i <= numFutureMonths; i++) {
     const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
     months.push(date);
@@ -160,60 +135,85 @@ const generateRandomExpensesData = (monthsToConsider) => {
   monthsToConsider.forEach(monthDate => {
     const year = monthDate.getFullYear();
     const month = monthDate.getMonth();
-    const numExpenses = Math.floor(Math.random() * 5) + 3;
+    const numExpenses = Math.floor(Math.random() * 5) + 3; // Gera entre 3 e 7 despesas por mês
 
     for (let i = 0; i < numExpenses; i++) {
-      const day = Math.floor(Math.random() * 28) + 1;
-      const value = parseFloat((Math.random() * 480 + 20).toFixed(2));
+      const day = Math.floor(Math.random() * 28) + 1; // Dia aleatório entre 1 e 28
+      const value = parseFloat((Math.random() * 480 + 20).toFixed(2)); // Valor aleatório entre 20 e 500
       const description = expenseDescriptions[Math.floor(Math.random() * expenseDescriptions.length)];
       const createdAtDate = new Date(year, month, day);
       const isPaidRandom = Math.random() > 0.5; // 50% de chance de ser paga
 
       generatedExpenses.push({
-        id: `${year}-${month}-${i}-${Math.random()}`,
+        id: `${year}-${month}-${i}-${Math.random()}`, // ID único para cada despesa
         description,
         value,
         createdAt: createdAtDate.toISOString(),
-        status: isPaidRandom ? 'paid' : 'pending', // Geração aleatória de status
-        paidAt: isPaidRandom ? new Date().toISOString() : null, // Geração de data de pagamento se for paga
-        paymentMethod: 'Débito',
+        status: isPaidRandom ? 'paid' : 'pending', // Status aleatório
+        paidAt: isPaidRandom ? new Date().toISOString() : null, // Data de pagamento se paga
+        paymentMethod: 'Débito', // Por simplicidade, todas as despesas geradas são de débito
         dueDate: createdAtDate.toISOString(),
-        deletedAt: null, // Garante que despesas geradas não estão deletadas
+        deletedAt: null, // Despesas geradas inicialmente não estão deletadas
       });
     }
   });
+  // Ordena as despesas por data de criação
   return generatedExpenses.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 };
 
 
-export default function HomeScreen({ navigation }) { // Adicionado 'navigation' como prop
-  const insets = useSafeAreaInsets();
+export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets(); // Hook para obter os insets da área segura da tela
 
+  // Estado para controlar o carregamento inicial da aplicação
   const [loadingApp, setLoadingApp] = useState(true);
+  // Estado para armazenar todas as receitas carregadas
   const [allIncomes, setAllIncomes] = useState([]);
+  // Estado para armazenar todas as despesas carregadas
   const [allExpenses, setAllExpenses] = useState([]);
 
+  // Estados para controlar a visibilidade e seleção do modal de limpeza de dados
   const [isClearDataModalVisible, setIsClearDataModalVisible] = useState(false);
-  const [selectedClearOption, setSelectedClearOption] = useState('4');
+  const [selectedClearOption, setSelectedClearOption] = useState('4'); // Opção padrão: limpar todos os dados
 
+  // Estados para controlar a visibilidade e seleção do picker de mês/ano no modal de limpeza específica
   const [isMonthYearPickerVisible, setIsMonthYearYearPickerVisible] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [pickerYear, setPickerYear] = useState(String(new Date().getFullYear()));
 
+  // Referência para a lista completa de meses que podem ser exibidos
   const monthsToDisplay = useRef(generateMonthsToDisplay());
 
+  // Objeto Date para representar o primeiro dia do mês atual do sistema
   const today = new Date();
   const initialMonthDate = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), []);
 
+  // Estado para o índice do mês atualmente visível na FlatList
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
+  // Referência para a FlatList, usada para controle de rolagem programática
   const flatListRef = useRef(null);
 
+  // Referência para controlar se uma tentativa de rolagem já foi feita (evita múltiplos scrolls)
   const scrollAttempted = useRef(false);
 
+  /**
+   * Função auxiliar para obter o último dia de um determinado mês e ano.
+   * @param {number} year - O ano.
+   * @param {number} month - O mês (0-indexado).
+   * @returns {number} O último dia do mês.
+   */
   const getLastDayOfMonth = (year, month) => {
     return new Date(year, month + 1, 0).getDate();
   };
 
+  /**
+   * Filtra e processa as despesas para um mês específico.
+   * Considera despesas fixas (com seus meses de exclusão) e despesas de débito/crédito.
+   * @param {Date} monthDate - O objeto Date representando o mês alvo.
+   * @param {Array<object>} expensesData - Array de todas as despesas.
+   * @param {boolean} onlyActive - Se deve retornar apenas despesas ativas (não soft-deleted).
+   * @returns {Array<object>} Array de despesas filtradas e processadas para o mês.
+   */
   const getExpensesForMonth = useCallback((monthDate, expensesData, onlyActive = false) => {
     const targetMonth = monthDate.getMonth();
     const targetYear = monthDate.getFullYear();
@@ -223,16 +223,17 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     let expensesForThisMonth = [];
 
     expensesData.forEach(item => {
-      // Ignora itens marcados para exclusão suave (deletedAt)
+      // Ignora itens marcados para exclusão suave
       if (item.deletedAt) {
         return;
       }
 
+      // Se `onlyActive` é true, ignora itens com status 'inactive'
       if (onlyActive && item.status === 'inactive') {
         return;
       }
 
-      // Lógica para despesas fixas
+      // Lógica específica para despesas fixas
       if (item.paymentMethod === 'Fixa') {
         // Verifica se o mês/ano atual está na lista de meses excluídos para essa despesa fixa
         if (item.excludedMonths && item.excludedMonths.includes(currentMonthYearString)) {
@@ -247,14 +248,14 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
           let dayForFixedExpense = item.dueDayOfMonth || 1;
           const lastDayOfTargetMonth = getLastDayOfMonth(targetYear, targetMonth);
           
-          // Ajusta o dia se for maior que o número de dias do mês
+          // Ajusta o dia de vencimento se for maior que o número de dias do mês alvo
           if (dayForFixedExpense > lastDayOfTargetMonth) {
             dayForFixedExpense = lastDayOfTargetMonth;
           }
 
           const fixedDueDate = new Date(targetYear, targetMonth, dayForFixedExpense);
           
-          // Encontra o status específico para este mês/ano
+          // Encontra o status específico para este mês/ano (se houver um status mensal)
           const monthYearKey = `${targetYear}-${targetMonth}`;
           const monthStatus = item.monthlyStatus?.find(
             status => status.monthYear === monthYearKey
@@ -262,13 +263,11 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
 
           expensesForThisMonth.push({
             ...item,
-            dueDate: fixedDueDate.toISOString(),
-            id: `${item.id}-${targetYear}-${targetMonth}`,
-            originalId: item.id,
-            // A descrição da despesa fixa **NÃO** é ajustada aqui para evitar duplicação de "(Fixa)"
-            description: item.description, 
-            // Usa o status específico do mês se existir, senão usa 'pending'
-            status: monthStatus?.status || 'pending',
+            dueDate: fixedDueDate.toISOString(), // Define a data de vencimento ajustada para o mês
+            id: `${item.id}-${targetYear}-${targetMonth}`, // ID único por mês para despesas fixas
+            originalId: item.id, // Referência ao ID original da despesa fixa
+            description: item.description, // Descrição original (o "(Fixa)" é adicionado na renderização)
+            status: monthStatus?.status || 'pending', // Usa o status mensal ou 'pending'
             paidAt: monthStatus?.paidAt || null
           });
         }
@@ -277,13 +276,12 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       else if (item.paymentMethod === 'Débito' || item.paymentMethod === 'Crédito') {
         if (item.dueDate) {
           const itemDueDate = new Date(item.dueDate);
-          // Inclui a despesa se a data de vencimento (ou compra para débito) for no mês/ano atual
+          // Inclui a despesa se a data de vencimento for no mês/ano atual
           if (itemDueDate.getMonth() === targetMonth && itemDueDate.getFullYear() === targetYear) {
-            // Para despesas de crédito, mantém o ID original com o número da parcela
+            // Para despesas de crédito, garante que o ID e número da parcela sejam mantidos
             if (item.paymentMethod === 'Crédito') {
               expensesForThisMonth.push({
                 ...item,
-                // Mantém o ID original com o número da parcela
                 id: item.id,
                 installmentNumber: item.installmentNumber
               });
@@ -294,14 +292,22 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         }
       }
     });    
-    // Ordena as despesas pela data de vencimento ou criação
+    // Ordena as despesas pela data de vencimento ou criação para exibição consistente
     return expensesForThisMonth.sort((a, b) => {
       const dateA = new Date(a.dueDate || a.createdAt); 
       const dateB = new Date(b.dueDate || b.createdAt);
       return dateA.getTime() - dateB.getTime();
     });
-  }, []);
+  }, []); // Depende apenas de si mesmo para evitar recriação desnecessária
 
+  /**
+   * Filtra e processa as receitas para um mês específico.
+   * Considera receitas fixas (com seus meses de exclusão) e receitas de ganho.
+   * @param {Date} monthDate - O objeto Date representando o mês alvo.
+   * @param {Array<object>} incomesData - Array de todas as receitas.
+   * @param {boolean} onlyActive - Se deve retornar apenas receitas ativas (não soft-deleted).
+   * @returns {Array<object>} Array de receitas filtradas e processadas para o mês.
+   */
   const getIncomesForMonth = useCallback((monthDate, incomesData, onlyActive = false) => {
     const targetMonth = monthDate.getMonth();
     const targetYear = monthDate.getFullYear();
@@ -311,16 +317,17 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     let incomesForThisMonth = [];
 
     incomesData.forEach(item => {
-      // Ignora itens marcados para exclusão suave (deletedAt)
+      // Ignora itens marcados para exclusão suave
       if (item.deletedAt) {
         return;
       }
 
+      // Se `onlyActive` é true, ignora itens com status 'inactive'
       if (onlyActive && item.status === 'inactive') {
         return;
       }
 
-      // Lógica para receitas fixas
+      // Lógica específica para receitas fixas
       if (item.type === 'Fixo') {
         // Verifica se o mês/ano atual está na lista de meses excluídos para essa receita fixa
         if (item.excludedMonths && item.excludedMonths.includes(currentMonthYearString)) {
@@ -333,7 +340,9 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         if (createdAtMonthStart <= displayMonthStartTimestamp) {
           incomesForThisMonth.push(item);
         }
-      } else if (item.type === 'Ganho') {
+      }
+      // Lógica para receitas de ganho (receitas pontuais)
+      else if (item.type === 'Ganho') {
         // Inclui a receita se o mês e ano da receita corresponderem ao mês/ano atual
         if (item.month === targetMonth && item.year === targetYear) {
           incomesForThisMonth.push(item);
@@ -341,10 +350,13 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       }
     });    
     return incomesForThisMonth;
-  }, []);
+  }, []); // Depende apenas de si mesmo
 
-  // UseMemo para filtrar os meses a serem exibidos na FlatList horizontal.
-  // Garante que apenas meses com receitas ou despesas ativas, ou o mês atual, sejam mostrados.
+  /**
+   * `useMemo` para filtrar os meses a serem exibidos na FlatList horizontal.
+   * Garante que apenas meses com receitas ou despesas ativas, ou o mês atual do sistema, sejam mostrados.
+   * Recomputa apenas quando `monthsToDisplay`, `initialMonthDate`, `allExpenses` ou `allIncomes` mudam.
+   */
   const filteredMonthsToDisplay = useMemo(() => {
     const allGeneratedMonths = monthsToDisplay.current;
     const todayMonth = initialMonthDate.getMonth();
@@ -359,6 +371,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       const activeIncomesForMonth = getIncomesForMonth(monthDate, allIncomes, true);
       const hasActiveIncomes = activeIncomesForMonth.length > 0;
 
+      // Retorna true se for o mês atual, ou se tiver despesas/receitas ativas
       return isCurrentSystemMonth || hasActiveExpenses || hasActiveIncomes;
     });
 
@@ -370,37 +383,50 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       filtered.push(initialMonthDate);
     }
 
+    // Ordena os meses cronologicamente
     return filtered.sort((a, b) => a.getTime() - b.getTime());
 
   }, [monthsToDisplay, initialMonthDate, allExpenses, allIncomes, getExpensesForMonth, getIncomesForMonth]);
 
-  // Opções para o Picker de meses no modal de limpeza de dados
+  /**
+   * `useMemo` para gerar as opções de meses para o Picker no modal de limpeza de dados.
+   * Obtém meses únicos dos meses filtrados.
+   */
   const pickerMonthOptions = useMemo(() => {
     const uniqueMonths = new Set();
     filteredMonthsToDisplay.forEach(date => uniqueMonths.add(String(date.getMonth() + 1).padStart(2, '0')));
     return Array.from(uniqueMonths).sort();
   }, [filteredMonthsToDisplay]);
 
-  // Opções para o Picker de anos no modal de limpeza de dados
+  /**
+   * `useMemo` para gerar as opções de anos para o Picker no modal de limpeza de dados.
+   * Obtém anos únicos dos meses filtrados.
+   */
   const pickerYearOptions = useMemo(() => {
     const uniqueYears = new Set();
     filteredMonthsToDisplay.forEach(date => uniqueYears.add(String(date.getFullYear())));
     return Array.from(uniqueYears).sort();
   }, [filteredMonthsToDisplay]);
 
-  // Carrega os dados de receitas e despesas do AsyncStorage.
-  // Calcula o índice do mês atual para a rolagem inicial da FlatList.
+  /**
+   * Carrega os dados de receitas e despesas do AsyncStorage.
+   * Calcula o índice do mês atual para a rolagem inicial da FlatList.
+   * É um `useCallback` para evitar recriações desnecessárias.
+   */
   const loadData = useCallback(async () => {
-    setLoadingApp(true);
+    setLoadingApp(true); // Inicia o indicador de carregamento
     try {
+      // Carrega receitas
       const storedIncomesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.INCOMES);
       const storedIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
       setAllIncomes(storedIncomes);
       
+      // Carrega despesas
       const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
       const currentExpenses = storedExpensesJson ? JSON.parse(storedExpensesJson) : [];
       setAllExpenses(currentExpenses);
 
+      // --- Lógica para determinar o `initialScrollIndex` ---
       // Recria a lista de meses filtrados temporariamente para encontrar o índice correto
       const tempFilteredMonths = monthsToDisplay.current.filter(monthDate => {
         const isCurrentSystemMonth = monthDate.getMonth() === initialMonthDate.getMonth() && monthDate.getFullYear() === initialMonthDate.getFullYear();
@@ -410,12 +436,13 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         const hasActiveIncomes = activeIncomesForMonth.length > 0;
         return isCurrentSystemMonth || hasActiveExpenses || hasActiveIncomes;
       });
+      // Garante que o mês atual esteja na lista, mesmo que não tenha movimentos
       if (!tempFilteredMonths.some(m => m.getTime() === initialMonthDate.getTime())) {
         tempFilteredMonths.push(initialMonthDate);
       }
-      tempFilteredMonths.sort((a, b) => a.getTime() - b.getTime());
+      tempFilteredMonths.sort((a, b) => a.getTime() - b.getTime()); // Re-ordena
 
-      // Encontra o índice do mês atual na lista filtrada
+      // Encontra o índice do mês atual na lista filtrada para a rolagem
       const targetIndex = tempFilteredMonths.findIndex(monthDate =>
         monthDate.getMonth() === initialMonthDate.getMonth() &&
         monthDate.getFullYear() === initialMonthDate.getFullYear()
@@ -425,7 +452,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         setCurrentMonthIndex(targetIndex);
         console.log(`[DEBUG - loadData]: Índice inicial do mês atual calculado: ${targetIndex}`);
       } else {
-        setCurrentMonthIndex(0); // Fallback para índice 0 se não encontrar
+        setCurrentMonthIndex(0); // Fallback para índice 0
         console.warn(`[DEBUG - loadData]: Mês atual do sistema não encontrado na lista filtrada, padrão para índice 0.`);
       }
 
@@ -433,12 +460,16 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       console.error("HomeScreen: Erro ao carregar dados do AsyncStorage:", error);
       Alert.alert('Erro de Carregamento', 'Não foi possível carregar os dados de finanças do armazenamento local.');
     } finally {
-      setLoadingApp(false);
-      scrollAttempted.current = false; // Reseta a flag de rolagem
+      setLoadingApp(false); // Finaliza o indicador de carregamento
+      scrollAttempted.current = false; // Reseta a flag de rolagem para permitir um novo scroll
     }
-  }, [initialMonthDate, monthsToDisplay, getExpensesForMonth, getIncomesForMonth]);
+  }, [initialMonthDate, monthsToDisplay, getExpensesForMonth, getIncomesForMonth]); // Depende dessas funções/variáveis
 
-  // Função para gerar despesas aleatórias e persistir no AsyncStorage
+  /**
+   * Função para gerar despesas aleatórias para fins de teste e demonstração.
+   * Adiciona essas despesas às existentes no AsyncStorage.
+   * É um `useCallback` para evitar recriações desnecessárias.
+   */
   const handleGenerateRandomExpenses = useCallback(async () => {
     setLoadingApp(true);
     try {
@@ -447,35 +478,42 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
       const existingExpenses = storedExpensesJson ? JSON.parse(storedExpensesJson) : [];
       
-      const combinedExpenses = [...existingExpenses, ...generated];
+      const combinedExpenses = [...existingExpenses, ...generated]; // Combina as despesas
 
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(combinedExpenses));
       Alert.alert('Sucesso', `${generated.length} despesas aleatórias geradas e adicionadas para todos os meses!`);
-      await loadData(); // Recarrega os dados para exibir as novas despesas
+      await loadData(); // Recarrega os dados para que as novas despesas sejam exibidas
     } catch (error) {
       console.error("HomeScreen: Erro ao gerar despesas aleatórias:", error);
       Alert.alert('Erro', `Não foi possível gerar despesas aleatórias: ${error.message}`);
     } finally {
       setLoadingApp(false);
     }
-  }, [loadData, monthsToDisplay]);
+  }, [loadData, monthsToDisplay]); // Depende de `loadData` e `monthsToDisplay`
 
-  // Efeito que garante que os dados sejam recarregados sempre que a tela Home for focada
+  /**
+   * `useFocusEffect` para garantir que os dados sejam recarregados e a tela seja atualizada
+   * sempre que a `HomeScreen` for focada (ex: ao navegar de volta para ela).
+   */
   useFocusEffect(
     useCallback(() => {
-      scrollAttempted.current = false;
-      // Recarrega os dados da tela
+      scrollAttempted.current = false; // Reseta a flag para permitir rolagem no foco
       const fetchData = async () => {
         console.log("HomeScreen: Recarregando dados após foco");
         await loadData();
       };
       fetchData();
-      return () => {};
-    }, [loadData])
+      return () => {}; // Cleanup function
+    }, [loadData]) // Depende de `loadData`
   );
 
-  // Efeito para corrigir a rolagem da FlatList para o mês atual na montagem ou quando os dados mudam
+  /**
+   * `useEffect` para corrigir a rolagem da FlatList para o mês atual.
+   * É acionado na montagem ou quando `loadingApp`, `filteredMonthsToDisplay`, `initialMonthDate` ou `currentMonthIndex` mudam.
+   * Garante que a `FlatList` inicie no mês correto, evitando o "flicker".
+   */
   useEffect(() => {
+    // Só tenta rolar se o app não estiver carregando, houver meses para exibir e a rolagem ainda não foi tentada
     if (!loadingApp && filteredMonthsToDisplay.length > 0 && !scrollAttempted.current) {
         const targetIndex = filteredMonthsToDisplay.findIndex(monthDate =>
             monthDate.getMonth() === initialMonthDate.getMonth() &&
@@ -483,22 +521,29 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         );
 
         if (flatListRef.current && targetIndex !== -1 && currentMonthIndex === targetIndex) {
+            // Se já está no mês alvo e o índice já está correto, marca como rolado
             scrollAttempted.current = true;
             console.log(`[DEBUG - Scroll useEffect]: Já no mês alvo: ${getMonthName(initialMonthDate)}/${initialMonthDate.getFullYear()} (Index: ${targetIndex})`);
         } else if (flatListRef.current && targetIndex !== -1) {
+            // Se não está no mês alvo ou o índice precisa ser ajustado, realiza a rolagem
             setTimeout(() => {
                 if (flatListRef.current) {
                     flatListRef.current.scrollToIndex({ index: targetIndex, animated: false });
-                    setCurrentMonthIndex(targetIndex);
+                    setCurrentMonthIndex(targetIndex); // Atualiza o estado do índice
                     scrollAttempted.current = true;
                     console.log(`[DEBUG - Scroll useEffect]: Corrigindo rolagem para o mês alvo: ${getMonthName(initialMonthDate)}/${initialMonthDate.getFullYear()} (Index: ${targetIndex})`);
                 }
             }, 100); // Pequeno atraso para garantir que a FlatList esteja renderizada
         }
     }
-  }, [loadingApp, filteredMonthsToDisplay, initialMonthDate, currentMonthIndex]);
+  }, [loadingApp, filteredMonthsToDisplay, initialMonthDate, currentMonthIndex]); // Depende desses estados/refs
 
-  // Calcula o total de receitas para o mês atualmente exibido na FlatList
+  /**
+   * Calcula o total de receitas para o mês atualmente exibido.
+   * Considera receitas fixas e de ganho, e a lógica de exclusão suave.
+   * @param {Date} monthDate - O objeto Date do mês alvo.
+   * @returns {number} O valor total das receitas para o mês.
+   */
   const calculateTotalIncomeForMonth = (monthDate) => {
     const targetMonth = monthDate.getMonth();
     const targetYear = monthDate.getFullYear();
@@ -509,7 +554,6 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     
     allIncomes.forEach(income => {
       // Ignora receitas fixas que foram excluídas para este mês específico
-      // TODO: Considerar se receitas fixas deveriam ser marcadas com (Fixa) também.
       if (income.type === 'Fixo' && income.excludedMonths && income.excludedMonths.includes(currentMonthYearString)) {
         return;
       }
@@ -517,6 +561,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       const incomeCreationDate = new Date(income.createdAt);
       const creationMonthStart = new Date(incomeCreationDate.getFullYear(), incomeCreationDate.getMonth(), 1);
 
+      // Lógica para receitas fixas
       if (income.type === 'Fixo') {
         const isCreatedBeforeOrInDisplayMonth = creationMonthStart.getTime() <= displayMonthStart.getTime();
         
@@ -535,6 +580,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
           totalIncome += income.value;
         }
       } 
+      // Lógica para receitas de ganho
       else if (income.type === 'Ganho' && income.month === targetMonth && income.year === targetYear) {
         let isActiveInDisplayMonth = true;
         // Verifica se a receita de ganho foi desativada (soft deleted) antes ou no mês de exibição
@@ -554,7 +600,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     return totalIncome;
   };
 
-  // Obtém a data do mês atualmente exibido na FlatList
+  // Obtém a data do mês atualmente exibido na FlatList (baseado em `currentMonthIndex`)
   const currentDisplayedMonthDate = filteredMonthsToDisplay[currentMonthIndex] || initialMonthDate;
 
   // Calcula a receita total para o mês atualmente exibido
@@ -566,26 +612,24 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
   // Calcula o total das despesas do mês atualmente exibido
   const totalDespesasDisplayedMonth = currentDisplayedMonthExpenses.reduce((sum, item) => sum + item.value, 0);
 
-  // Calcula o valor final (Receita - Despesa) para o mês atualmente exibido
+  // Calcula o valor final (Receita Total - Despesa Total) para o mês atualmente exibido
   const valorFinalDisplayedMonth = currentMonthTotalIncome - totalDespesasDisplayedMonth;
 
   /**
    * Handler para navegar para a tela de edição de despesa.
-   * Navega para a aba 'DespesaTab' e, dentro dela, para a tela 'DespesaScreenInternal',
-   * passando a despesa a ser editada como parâmetro.
-   * Agora acionado por *toque longo*.
+   * Acionado por um *toque longo* em um item da lista de despesas.
    * @param {object} expense - O objeto de despesa a ser editado.
    */
   const handleEditExpense = (expense) => {
-    // Se for uma despesa fixa, usa o ID original (sem o sufixo de mês/ano)
+    // Se for uma despesa fixa ou parcela de crédito, usa o ID original (sem sufixos de mês/ano)
     const expenseToEdit = {
       ...expense,
-      id: expense.id.split('-')[0] // Remove o sufixo se existir
+      id: expense.id.split('-')[0] // Remove o sufixo se existir para pegar o ID base
     };
     
     navigation.navigate('DespesaTab', {
       screen: 'DespesaScreenInternal',
-      params: { expenseToEdit: expenseToEdit },
+      params: { expenseToEdit: expenseToEdit }, // Passa a despesa para a tela de edição
     });
   };
 
@@ -595,29 +639,31 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
    * @param {string} expenseId - O ID da despesa a ser atualizada.
    */
   const handleTogglePaidStatus = useCallback(async (expenseId) => {
-    // Extrai o ID base e os sufixos do ID completo
+    // Extrai o ID base e quaisquer sufixos do ID completo (ex: "ID_BASE-ANO-MES")
     const [baseId, ...suffixes] = expenseId.split('-');
     
-    // Busca a despesa que corresponde ao ID ou à parcela
     let expenseIndex = -1;
+    // Busca a despesa correspondente no array `allExpenses`
     const originalExpense = allExpenses.find((exp, index) => {
+      // Para despesas de crédito, procura pela parcela específica
       if (exp.paymentMethod === 'Crédito') {
-        // Para despesas de crédito, procura pela parcela específica
-        const isMatch = exp.id === expenseId || // ID exato
-                       (exp.originalExpenseId === baseId && exp.installmentNumber === parseInt(suffixes[0], 10)); // Parcela específica
+        const isMatch = exp.id === expenseId || // ID exato da parcela
+                       (exp.originalExpenseId === baseId && exp.installmentNumber === parseInt(suffixes[0], 10)); // ID base e número da parcela
         if (isMatch) {
           expenseIndex = index;
           return true;
         }
-      } else if (exp.paymentMethod === 'Fixa') {
-        // Para despesas fixas, usa o ID base
+      }
+      // Para despesas fixas, usa o ID base
+      else if (exp.paymentMethod === 'Fixa') {
         const isMatch = exp.id === baseId;
         if (isMatch) {
           expenseIndex = index;
           return true;
         }
-      } else {
-        // Para outras despesas, verifica o ID exato
+      }
+      // Para outras despesas (débito), verifica o ID exato
+      else {
         const isMatch = exp.id === expenseId;
         if (isMatch) {
           expenseIndex = index;
@@ -642,20 +688,23 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     const updatedExpenses = [...allExpenses];
     const expenseToUpdate = { ...updatedExpenses[expenseIndex] };
 
-    // Trata cada tipo de despesa de forma diferente
+    // --- Lógica para alternar status de acordo com o tipo de despesa ---
+    // Se for uma despesa fixa com sufixo de mês/ano (indicando uma instância mensal)
     if (expenseToUpdate.paymentMethod === 'Fixa' && suffixes.length === 2) {
-      // Para despesas fixas, gerencia os status por mês
       const [year, month] = suffixes;
+      // Inicializa o array `monthlyStatus` se não existir
       if (!expenseToUpdate.monthlyStatus) {
         expenseToUpdate.monthlyStatus = [];
       }
 
       const monthYearKey = `${year}-${month}`;
+      // Procura se já existe um status para este mês/ano específico
       const existingStatusIndex = expenseToUpdate.monthlyStatus.findIndex(
         status => status.monthYear === monthYearKey
       );
 
       if (existingStatusIndex >= 0) {
+        // Se já existe, alterna o status e a data de pagamento
         const currentStatus = expenseToUpdate.monthlyStatus[existingStatusIndex].status;
         expenseToUpdate.monthlyStatus[existingStatusIndex] = {
           monthYear: monthYearKey,
@@ -663,14 +712,17 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
           paidAt: currentStatus === 'paid' ? null : new Date().toISOString()
         };
       } else {
+        // Se não existe, adiciona um novo status 'paid'
         expenseToUpdate.monthlyStatus.push({
           monthYear: monthYearKey,
           status: 'paid',
           paidAt: new Date().toISOString()
         });
       }
-    } else if (expenseToUpdate.paymentMethod === 'Crédito') {
-      // Para despesas de crédito, atualiza apenas a parcela específica
+    }
+    // Se for uma despesa de crédito
+    else if (expenseToUpdate.paymentMethod === 'Crédito') {
+      // Alterna o status e a data de pagamento para a parcela específica
       if (expenseToUpdate.status === 'pending') {
         expenseToUpdate.status = 'paid';
         expenseToUpdate.paidAt = new Date().toISOString();
@@ -679,8 +731,10 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         expenseToUpdate.paidAt = null;
       }
       console.log(`[DEBUG - handleTogglePaidStatus]: Atualizando parcela ${expenseToUpdate.installmentNumber} para status: ${expenseToUpdate.status}`);
-    } else {
-      // Para despesas normais (débito), mantém a lógica original
+    }
+    // Para despesas normais (débito)
+    else {
+      // Alterna o status e a data de pagamento
       if (expenseToUpdate.status === 'pending') {
         expenseToUpdate.status = 'paid';
         expenseToUpdate.paidAt = new Date().toISOString();
@@ -690,10 +744,10 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       }
     }
 
-    updatedExpenses[expenseIndex] = expenseToUpdate;
-    setAllExpenses(updatedExpenses); // Atualiza o estado local de todas as despesas
+    updatedExpenses[expenseIndex] = expenseToUpdate; // Atualiza a despesa no array
+    setAllExpenses(updatedExpenses); // Atualiza o estado local com as despesas modificadas
 
-    // Persiste no AsyncStorage
+    // Persiste a mudança no AsyncStorage
     try {
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses));
       console.log(`[DEBUG - handleTogglePaidStatus]: Despesa ${expenseId} atualizada para status: ${expenseToUpdate.status}`);
@@ -701,11 +755,11 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
       console.error('Erro ao salvar status da despesa:', error);
       Alert.alert('Erro', 'Ocorreu um erro ao atualizar o status da despesa. Tente novamente.');
     }
-  }, [allExpenses]);
+  }, [allExpenses]); // Depende de `allExpenses` para obter o estado mais recente
 
   /**
-   * Retorna o texto de status formatado para uma despesa.
-   * Considera se a despesa está paga, pendente, vencendo ou atrasada.
+   * Retorna o texto de status formatado para uma despesa, considerando sua data de vencimento.
+   * Pode ser "Pago", "Vence Hoje", "Vence Amanhã", "Atrasado" ou "Vence".
    * @param {object} expense - O objeto de despesa.
    * @returns {string} O texto de status formatado.
    */
@@ -713,13 +767,15 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     if (expense.status === 'paid') {
       return 'Pago';
     } else {
-      const dueDate = parseDateString(formatDateForDisplay(new Date(expense.dueDate))); // Converte para Date e zera hora para comparação
+      // Cria objetos Date para comparação, zerando horas para evitar problemas de fuso horário/horário exato
+      const dueDate = parseDateString(formatDateForDisplay(new Date(expense.dueDate)));
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Zera horas, minutos, segundos e milissegundos para comparação de datas
+      today.setHours(0, 0, 0, 0);
 
       const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1); // Calcula a data de amanhã
+      tomorrow.setDate(today.getDate() + 1);
 
+      // Compara as datas para determinar o status
       if (dueDate.getTime() === today.getTime()) {
         return `Vence Hoje: ${formatDateForDisplay(new Date(expense.dueDate))}`;
       } else if (dueDate.getTime() === tomorrow.getTime()) {
@@ -735,6 +791,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
 
   /**
    * Renderiza cada seção de mês na FlatList horizontal.
+   * Exibe o título do mês/ano, um cabeçalho de tabela e a lista de despesas.
    * @param {object} param0 - Objeto contendo o item (monthDate) e o índice.
    * @returns {JSX.Element} Componente de visualização para o mês.
    */
@@ -744,7 +801,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     const monthName = getMonthName(monthDate);
     const year = monthDate.getFullYear();
 
-    // Verifica se a seção atual corresponde ao mês do sistema para destaque
+    // Verifica se a seção atual corresponde ao mês atual do sistema para aplicar destaque
     const isSystemCurrentMonth = monthDate.getMonth() === initialMonthDate.getMonth() &&
                                  initialMonthDate.getFullYear() === year;
 
@@ -756,7 +813,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         ]}>
           <Text style={styles.sectionTitle}>{String(monthName)} {String(year)}</Text>
 
-          {/* Cabeçalho da tabela de despesas - AGORA COM APENAS DESCRIÇÃO E VALOR */}
+          {/* Cabeçalho da tabela de despesas com colunas para checkbox, descrição e valor */}
           <View style={styles.tableHeader}>
             <View style={styles.checkboxHeaderColumn}></View> 
             <Text style={[styles.headerText, styles.descriptionColumnAdjusted]}>Despesa</Text>
@@ -764,15 +821,16 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
           </View>
 
           {expenses.length > 0 ? (
+            // Exibe a lista de despesas em um ScrollView
             <ScrollView style={styles.expensesScrollView}>
               {expenses.map((item) => (
                 <TouchableOpacity 
                   key={String(item.id)} 
                   style={styles.debitItemRowAdjusted} // Estilo ajustado para espaçamento vertical
-                  onLongPress={() => handleEditExpense(item)} // AGORA USA ONLONGPRESS PARA EDITAR
-                  activeOpacity={0.7} // Adiciona um feedback visual no toque
+                  onLongPress={() => handleEditExpense(item)} // Toque longo para editar a despesa
+                  activeOpacity={0.7} // Adiciona um feedback visual ao toque
                 >
-                  {/* Checkbox para marcar/desmarcar despesa como paga (ainda com onPress) */}
+                  {/* Checkbox para marcar/desmarcar despesa como paga */}
                   <TouchableOpacity onPress={() => handleTogglePaidStatus(item.id)} style={styles.checkboxContainerAdjusted}>
                     <Ionicons
                       name={item.status === 'paid' ? 'checkbox' : 'square-outline'} 
@@ -784,12 +842,14 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
                   <View style={styles.descriptionAndFooterContainer}>
                     <Text style={styles.debitText}>
                       {String(item.description)}
-                      {item.paymentMethod === 'Fixa' && " (Fixa)"} {/* Adiciona "(Fixa)" se for despesa fixa */}
+                      {/* Adiciona "(Fixa)" à descrição se o método de pagamento for 'Fixa' */}
+                      {item.paymentMethod === 'Fixa' && " (Fixa)"}
                     </Text>
-                    {/* Rodapé com Status/Vencimento */}
+                    {/* Rodapé com informações de Status/Vencimento */}
                     <Text style={styles.expenseStatusFooter}>{getStatusText(item)}</Text>
                   </View>
 
+                  {/* Valor da despesa formatado */}
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
                   </Text>
@@ -797,6 +857,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
               ))}
             </ScrollView>
           ) : (
+            // Mensagem se não houver despesas para o mês
             <Text style={styles.noExpensesText}>Nenhuma despesa para este mês.</Text>
           )}
         </View>
@@ -804,31 +865,38 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     );
   };
 
-  // Handler para quando a FlatList termina de rolar, atualizando o índice do mês atual
+  /**
+   * Handler para quando a FlatList termina de rolar.
+   * Calcula o novo índice do mês atualmente visível e atualiza o estado `currentMonthIndex`.
+   * @param {object} event - O objeto de evento nativo da rolagem.
+   */
   const handleScroll = (event) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
-    const newIndex = Math.round(contentOffsetX / width);
+    const newIndex = Math.round(contentOffsetX / width); // Calcula o índice baseado na largura da tela
     if (newIndex !== currentMonthIndex) {
       setCurrentMonthIndex(newIndex);
     }
   };
 
-  // Handler para confirmar a limpeza de dados, com base na opção selecionada no modal
+  /**
+   * Handler para confirmar a limpeza de dados.
+   * Realiza a ação de limpeza com base na opção selecionada no modal (limpeza geral ou por mês).
+   */
   const handleConfirmClearData = async () => {
     // Se a opção for limpar dados de um mês específico, abre o picker de mês/ano
     if (selectedClearOption === '0') {
       setPickerMonth(String(currentDisplayedMonthDate.getMonth() + 1).padStart(2, '0'));
       setPickerYear(String(currentDisplayedMonthDate.getFullYear()));
 
-      setIsClearDataModalVisible(false);
-      setIsMonthYearYearPickerVisible(true);
+      setIsClearDataModalVisible(false); // Fecha o modal de opções
+      setIsMonthYearYearPickerVisible(true); // Abre o modal de seleção de mês/ano
       return;
     }
 
     setIsClearDataModalVisible(false);
-    setLoadingApp(true);
+    setLoadingApp(true); // Inicia o indicador de carregamento
     
-    // Captura o mês antes da ação de limpeza, caso a limpeza afete o mês atual
+    // Captura o mês atual antes da ação de limpeza, caso a limpeza afete o mês atualmente exibido
     const monthBeforeAction = currentDisplayedMonthDate;
     const targetMonth = monthBeforeAction.getMonth();
     const targetYear = monthBeforeAction.getFullYear();
@@ -836,79 +904,86 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     console.log(`[DEBUG - Limpeza]: Tentando limpar dados (opção ${selectedClearOption}) para ${getMonthName(monthBeforeAction)}/${targetYear}`);
 
     try {
+      // Executa a ação de limpeza com base na opção selecionada
       switch (selectedClearOption) {
-        case '1':
+        case '1': // Limpar todas as receitas
           await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.INCOMES);
           Alert.alert('Sucesso', 'Todas as receitas foram limpas permanentemente.');
           break;
-        case '2':
+        case '2': // Limpar todas as despesas
           await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.EXPENSES);
           Alert.alert('Sucesso', 'Todas as despesas foram limpas permanentemente.');
           break;
-        case '3':
-          await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.CARDS); // CORRIGIDO: ASYNC_STORAGE_KEYS
+        case '3': // Limpar todos os cartões
+          await AsyncStorage.removeItem(ASYNC_STORAGE_KEYS.CARDS);
           Alert.alert('Sucesso', 'Todos os cartões foram limpos permanentemente.');
           break;
-        case '4':
+        case '4': // Limpar TODOS os dados
         default:
           await AsyncStorage.clear();
           Alert.alert('Sucesso', 'TODOS os dados foram apagados permanentemente e recarregados.');
           break;
       }
-      await loadData(); // Recarrega todos os dados após a limpeza
+      await loadData(); // Recarrega todos os dados para refletir as alterações
       
     } catch (error) {
       console.error("HomeScreen: Erro ao limpar dados:", error);
       Alert.alert('Erro', `Ocorreu um erro ao limpar os dados: ${error.message}`);
     } finally {
-      setLoadingApp(false);
+      setLoadingApp(false); // Finaliza o indicador de carregamento
     }
   };
 
-  // Realiza a limpeza suave de dados para um mês/ano específico
+  /**
+   * Realiza a limpeza suave de dados para um mês e ano específicos selecionados pelo usuário.
+   * Marca receitas e despesas como inativas ou as adiciona a uma lista de meses excluídos.
+   */
   const performMonthYearClear = async () => {
     setIsMonthYearYearPickerVisible(false);
     setLoadingApp(true);
 
-    const monthToClear = parseInt(pickerMonth, 10) - 1; // Mês é 0-indexado
+    const monthToClear = parseInt(pickerMonth, 10) - 1; // Mês é 0-indexado em JS
     const yearToClear = parseInt(pickerYear, 10);
     const targetDateToClear = new Date(yearToClear, monthToClear, 1);
     const targetMonthYearString = formatMonthYearForExclusion(targetDateToClear);
 
     console.log(`[DEBUG - Limpeza]: Limpando dados para ${getMonthName(targetDateToClear)}/${yearToClear} (selecionado pelo usuário)`);
 
+    // Define o último dia do mês alvo para usar como `deletedAt` para itens não-fixos
     const lastDayOfTargetMonth = new Date(yearToClear, monthToClear + 1, 0); 
 
     try {
-      // Atualiza as receitas, marcando como inativas ou adicionando à lista de excluídos para fixas
+      // --- Atualiza as receitas ---
       const updatedIncomes = allIncomes.map(income => {
+        // Para receitas fixas, adiciona o mês atual à lista de `excludedMonths`
         if (income.type === 'Fixo') {
-          // Adiciona o mês atual à lista de meses excluídos para receitas fixas
           const newExcludedMonths = income.excludedMonths ? [...income.excludedMonths, targetMonthYearString] : [targetMonthYearString];
           return { ...income, excludedMonths: Array.from(new Set(newExcludedMonths)) };
-        } else if (income.type === 'Ganho' && 
+        }
+        // Para receitas de ganho que correspondem ao mês/ano, marca como inativa
+        else if (income.type === 'Ganho' && 
                    income.month === monthToClear &&
                    income.year === yearToClear &&
                    income.status !== 'inactive') {
-          // Marca receitas de ganho como inativas com data de exclusão
           return { ...income, status: 'inactive', deletedAt: lastDayOfTargetMonth.toISOString() };
         }
         return income;
       });
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.INCOMES, JSON.stringify(updatedIncomes));
 
-      // Atualiza as despesas, marcando como inativas ou adicionando à lista de excluídos para fixas
+      // --- Atualiza as despesas ---
       const updatedExpenses = allExpenses.map(expense => {
+        // Para despesas fixas, adiciona o mês atual à lista de `excludedMonths`
         if (expense.paymentMethod === 'Fixa') {
-          // Adiciona o mês atual à lista de meses excluídos para despesas fixas
           const newExcludedMonths = expense.excludedMonths ? [...expense.excludedMonths, targetMonthYearString] : [targetMonthYearString];
           return { ...expense, excludedMonths: Array.from(new Set(newExcludedMonths)) };
-        } else if (expense.paymentMethod === 'Débito' || expense.paymentMethod === 'Crédito') {
+        }
+        // Para despesas de débito/crédito que vencem no mês/ano, marca como inativa
+        else if (expense.paymentMethod === 'Débito' || expense.paymentMethod === 'Crédito') {
             const expenseDueDate = new Date(expense.dueDate);
             const expenseMonth = expenseDueDate.getMonth();
             const expenseYear = expenseDueDate.getFullYear();
 
-            // Marca despesas de débito/crédito como inativas com data de exclusão
             if (expenseMonth === monthToClear &&
                 expenseYear === yearToClear &&
                 expense.status !== 'inactive') {
@@ -917,20 +992,20 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         }
         return expense;
       });
-      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses)); // CORRIGIDO: ASYNC_STORAGE_KEYS
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(updatedExpenses)); // Persiste as despesas atualizadas
 
       Alert.alert('Sucesso', `Dados do mês ${getMonthName(targetDateToClear)}/${yearToClear} marcados como inativos.`);
-      await loadData(); // Recarrega os dados para refletir as mudanças
+      await loadData(); // Recarrega os dados da Home Screen para refletir as mudanças
       
     } catch (error) {
       console.error("HomeScreen: Erro ao limpar dados do mês selecionado:", error);
       Alert.alert('Erro', `Não foi possível limpar os dados do mês selecionado: ${error.message}`);
     } finally {
-      setLoadingApp(false);
+      setLoadingApp(false); // Finaliza o indicador de carregamento
     }
   };
 
-  // Abre o modal de opções de limpeza de dados
+  /** Abre o modal de opções de limpeza de dados. */
   const clearAllData = () => {
     setIsClearDataModalVisible(true);
   };
@@ -945,7 +1020,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
     );
   }
 
-  // Opções para o Picker do modal de limpeza de dados
+  // Opções para o Picker do modal de limpeza de dados (predefinidas)
   const clearOptions = [
     { label: "Limpar dados de um mês específico (exclusão suave)", value: "0" },
     { label: "Limpar todas as receitas (permanente)", value: "1" },
@@ -965,7 +1040,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         </TouchableOpacity>
       </View>
 
-      {/* FlatList horizontal para exibir os meses */}
+      {/* FlatList horizontal para exibir os meses paginados */}
       <FlatList
         ref={flatListRef}
         data={filteredMonthsToDisplay}
@@ -974,17 +1049,17 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll} // Captura o final da rolagem para atualizar o mês
-        initialScrollIndex={currentMonthIndex} // Define o mês inicial
-        extraData={currentMonthIndex} // Força re-renderização quando o índice muda
-        getItemLayout={(data, index) => ({
-          length: width, // Largura de cada item é a largura da tela
+        onMomentumScrollEnd={handleScroll} // Acionado ao final da rolagem para atualizar o mês
+        initialScrollIndex={currentMonthIndex} // Define o mês inicial na montagem
+        extraData={currentMonthIndex} // Força re-renderização quando o índice do mês visível muda
+        getItemLayout={(data, index) => ({ // Otimização para performance da FlatList
+          length: width, // Cada item ocupa a largura total da tela
           offset: width * index,
           index,
         })}
       />
 
-      {/* Container de resumo financeiro */}
+      {/* Container de resumo financeiro do mês atual */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Receita total:</Text>
@@ -994,6 +1069,7 @@ export default function HomeScreen({ navigation }) { // Adicionado 'navigation' 
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Valor final:</Text>
+          {/* Altera a cor do valor final com base se é positivo ou negativo */}
           <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
             {String(valorFinalDisplayedMonth.toFixed(2)).replace('.', ',') + ' R$'}
           </Text>
@@ -1222,17 +1298,15 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  // ATUALIZADO: Usado para dar mais flexibilidade à descrição no cabeçalho
+  // Estilo para a coluna da descrição no cabeçalho, ajustado para flexibilidade
   descriptionColumnAdjusted: {
     flex: 3, 
     textAlign: 'left',
   },
-  // REMOVIDO: dateColumn, pois a informação está no rodapé.
-
   expensesScrollView: {
     flex: 1,
   },
-  // ATUALIZADO: Estilo do item da linha para maior espaçamento
+  // Estilo da linha de item de despesa, ajustado para maior espaçamento e área de toque
   debitItemRowAdjusted: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1241,7 +1315,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
     paddingHorizontal: 5,
   },
-  // NOVO: Container para agrupar descrição e rodapé de status
+  // Container para agrupar descrição e rodapé de status
   descriptionAndFooterContainer: {
     flex: 3, // Ocupa o espaço que a descrição e o rodapé precisam
     justifyContent: 'center',
@@ -1251,7 +1325,7 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 2, // Pequena margem para separar da informação de status
   },
-  // NOVO: Estilo para o rodapé de status/vencimento
+  // Estilo para o rodapé de status/vencimento (fonte menor e cor mais suave)
   expenseStatusFooter: {
     fontSize: 12, // Fonte menor para o rodapé
     color: '#666', // Cor mais suave
@@ -1261,17 +1335,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  // NOVO: Estilo para a coluna do checkbox no cabeçalho
+  // Estilo para a coluna do checkbox no cabeçalho (largura fixa)
   checkboxHeaderColumn: {
-    width: 30, // Largura fixa para o ícone
+    width: 30, 
   },
-  // ATUALIZADO: Estilo para o container do checkbox com mais marginRight
+  // Estilo para o container do checkbox (espaçamento e centralização)
   checkboxContainerAdjusted: {
     paddingRight: 15, // Aumentado o espaçamento entre checkbox e descrição
     width: 45, // Garante que o checkbox e o espaçamento ocupem uma largura definida
     alignItems: 'center', // Centraliza o ícone dentro do espaço
   },
-  valueColumn: { // Mantido como estava, mas referenciado no JSX
+  valueColumn: { 
     flex: 1.5,
     textAlign: 'right',
   },
