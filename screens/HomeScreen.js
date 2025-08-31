@@ -844,6 +844,9 @@ export default function HomeScreen({ navigation }) {
                       {String(item.description)}
                       {/* Adiciona "(Fixa)" à descrição se o método de pagamento for 'Fixa' */}
                       {item.paymentMethod === 'Fixa' && " (Fixa)"}
+                      {/* Adiciona número da parcela para despesas de crédito */}
+                      {item.paymentMethod === 'Crédito' && item.installmentNumber && item.totalInstallments && 
+                        ` (${item.installmentNumber}/${item.totalInstallments})`}
                     </Text>
                     {/* Rodapé com informações de Status/Vencimento */}
                     <Text style={styles.expenseStatusFooter}>{getStatusText(item)}</Text>
