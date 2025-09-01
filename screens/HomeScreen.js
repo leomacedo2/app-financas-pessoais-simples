@@ -127,40 +127,84 @@ const generateRandomExpensesData = (monthsToConsider) => {
     'Telefone', 'Transporte', 'Lazer', 'Educação', 'Saúde', 'Restaurante', 'Roupas'
   ];
 
+  console.log("[DEBUG] Iniciando generateRandomExpensesData");
+  console.log("[DEBUG] monthsToConsider:", monthsToConsider);
+
   if (!Array.isArray(monthsToConsider)) {
     console.error("generateRandomExpensesData: monthsToConsider não é um array válido.");
     return [];
   }
 
-  monthsToConsider.forEach(monthDate => {
+  // Define limites para o número de despesas por mês
+  const minDespesasPorMes = 3;  // Mínimo de despesas por mês
+  const maxDespesasPorMes = 8;  // Máximo de despesas por mês
+  
+  console.log("[DEBUG] Meses disponíveis:", monthsToConsider.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
+  
+  // Filtra apenas os meses atuais e futuros
+  const today = new Date();
+  const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  
+  const futureMeses = monthsToConsider.filter(monthDate => {
+    const startOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    return startOfMonth >= currentMonth;
+  }).sort((a, b) => a.getTime() - b.getTime());
+  
+  console.log("[DEBUG] Meses futuros:", futureMeses.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
+  
+  // Para cada mês disponível, gera algumas despesas
+  futureMeses.forEach((monthDate, monthIndex) => {
     const year = monthDate.getFullYear();
     const month = monthDate.getMonth();
-    const numExpenses = Math.floor(Math.random() * 5) + 3; // Gera entre 3 e 7 despesas por mês
-
-    for (let i = 0; i < numExpenses; i++) {
-      const day = Math.floor(Math.random() * 28) + 1; // Dia aleatório entre 1 e 28
-      const value = parseFloat((Math.random() * 480 + 20).toFixed(2)); // Valor aleatório entre 20 e 500
+    
+    // Gera um número aleatório de despesas para este mês
+    const numDespesasDesteMes = Math.floor(
+      Math.random() * (maxDespesasPorMes - minDespesasPorMes + 1) + minDespesasPorMes
+    );
+    
+    console.log(`[DEBUG] Gerando ${numDespesasDesteMes} despesas para ${month + 1}/${year}`);
+    
+    // Gera as despesas para este mês
+    for (let i = 0; i < numDespesasDesteMes; i++) {
+      // Gera um dia aleatório para a despesa, evitando datas inválidas
+      const maxDaysInMonth = new Date(year, month + 1, 0).getDate();
+      const day = Math.floor(Math.random() * maxDaysInMonth) + 1;
+      
+      // Gera um valor aleatório entre R$ 20 e R$ 500
+      const value = parseFloat((Math.random() * 480 + 20).toFixed(2));
+      
+      // Seleciona uma descrição aleatória
       const description = expenseDescriptions[Math.floor(Math.random() * expenseDescriptions.length)];
+      
       const createdAtDate = new Date(year, month, day);
-      const isPaidRandom = Math.random() > 0.5; // 50% de chance de ser paga
+      const today = new Date();
+      
+      // Se for o mês atual, marca como pago apenas despesas até o dia atual
+      const isPaidRandom = month === today.getMonth() && year === today.getFullYear()
+        ? day <= today.getDate() && Math.random() > 0.3  // 70% de chance de estar pago se for até hoje
+        : Math.random() > 0.5;  // 50% de chance para meses futuros
 
-      generatedExpenses.push({
-        id: `${year}-${month}-${i}-${Math.random()}`, // ID único para cada despesa
+      const expense = {
+        id: Date.now().toString() + monthIndex + i, // ID único com índice do mês e da despesa
         description,
         value,
         createdAt: createdAtDate.toISOString(),
-        status: isPaidRandom ? 'paid' : 'pending', // Status aleatório
-        paidAt: isPaidRandom ? new Date().toISOString() : null, // Data de pagamento se paga
-        paymentMethod: 'Débito', // Por simplicidade, todas as despesas geradas são de débito
+        status: isPaidRandom ? 'paid' : 'pending',
+        paidAt: isPaidRandom ? new Date().toISOString() : null,
+        paymentMethod: 'Débito',
         dueDate: createdAtDate.toISOString(),
-        deletedAt: null, // Despesas geradas inicialmente não estão deletadas
-      });
+        deletedAt: null
+      };
+
+      console.log("[DEBUG] Despesa gerada:", expense);
+      generatedExpenses.push(expense);
     }
   });
-  // Ordena as despesas por data de criação
+
+  console.log("[DEBUG] Total de despesas geradas:", generatedExpenses.length);
+
   return generatedExpenses.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 };
-
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets(); // Hook para obter os insets da área segura da tela
@@ -273,7 +317,7 @@ export default function HomeScreen({ navigation }) {
         }
       }
       // Lógica para despesas de Débito e Crédito
-      else if (item.paymentMethod === 'Débito' || item.paymentMethod === 'Crédito') {
+      else {
         if (item.dueDate) {
           const itemDueDate = new Date(item.dueDate);
           // Inclui a despesa se a data de vencimento for no mês/ano atual
@@ -473,15 +517,24 @@ export default function HomeScreen({ navigation }) {
   const handleGenerateRandomExpenses = useCallback(async () => {
     setLoadingApp(true);
     try {
-      const generated = generateRandomExpensesData(monthsToDisplay.current); 
+      console.log("[DEBUG] Iniciando geração de despesas aleatórias");
+      const generated = generateRandomExpensesData(monthsToDisplay.current);
+      console.log("[DEBUG] Despesas geradas:", generated);
 
       const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
       const existingExpenses = storedExpensesJson ? JSON.parse(storedExpensesJson) : [];
+      console.log("[DEBUG] Despesas existentes:", existingExpenses);
       
       const combinedExpenses = [...existingExpenses, ...generated]; // Combina as despesas
+      console.log("[DEBUG] Total de despesas após combinação:", combinedExpenses.length);
 
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(combinedExpenses));
-      Alert.alert('Sucesso', `${generated.length} despesas aleatórias geradas e adicionadas para todos os meses!`);
+      console.log("[DEBUG] Despesas salvas no AsyncStorage");
+
+      setAllExpenses(combinedExpenses); // Atualiza o estado diretamente
+      console.log("[DEBUG] Estado de allExpenses atualizado");
+
+      Alert.alert('Sucesso', `${generated.length} despesas aleatórias geradas e adicionadas!`);
       await loadData(); // Recarrega os dados para que as novas despesas sejam exibidas
     } catch (error) {
       console.error("HomeScreen: Erro ao gerar despesas aleatórias:", error);
@@ -621,11 +674,24 @@ export default function HomeScreen({ navigation }) {
    * @param {object} expense - O objeto de despesa a ser editado.
    */
   const handleEditExpense = (expense) => {
-    // Se for uma despesa fixa ou parcela de crédito, usa o ID original (sem sufixos de mês/ano)
-    const expenseToEdit = {
+    // Prepara o objeto de despesa para edição mantendo informações importantes
+    let expenseToEdit = {
       ...expense,
-      id: expense.id.split('-')[0] // Remove o sufixo se existir para pegar o ID base
+      originalExpenseId: expense.originalExpenseId || expense.id.split('-')[0], // Mantém o ID original para parcelas de crédito
     };
+
+    // Se for uma despesa fixa, mantém o ID completo para preservar o mês
+    if (expense.paymentMethod === 'Fixa') {
+      expenseToEdit.id = expense.id; // Mantém o ID completo com o mês
+    } else if (expense.paymentMethod === 'Crédito') {
+      // Para despesas de crédito, mantém informações das parcelas
+      expenseToEdit.id = expense.originalExpenseId || expense.id.split('-')[0];
+      expenseToEdit.installmentNumber = expense.installmentNumber;
+      expenseToEdit.totalInstallments = expense.totalInstallments;
+    } else {
+      // Para despesas de débito, usa o ID base
+      expenseToEdit.id = expense.id.split('-')[0];
+    }
     
     navigation.navigate('DespesaTab', {
       screen: 'DespesaScreenInternal',
