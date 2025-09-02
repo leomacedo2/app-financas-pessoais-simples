@@ -477,11 +477,23 @@ export default function DespesaScreen({ navigation, route }) {
           console.log("Parcelas de crédito adicionadas, originalExpenseId:", originalExpenseUniqueId);
         } else if (paymentMethod === 'Fixa') {
           let dayForFixedExpense = parseInt(fixedExpenseDueDay, 10);
-          const currentMonth = new Date().getMonth();
-          const currentYear = new Date().getFullYear();
-          const lastDayOfCurrentMonth = getLastDayOfMonth(currentYear, currentMonth);
-          if (dayForFixedExpense > lastDayOfCurrentMonth) {
-              dayForFixedExpense = lastDayOfCurrentMonth;
+          const today = new Date();
+          let startMonth = today.getMonth();
+          let startYear = today.getFullYear();
+
+          // Se o dia escolhido for menor que o dia atual, começa no próximo mês
+          if (dayForFixedExpense <= today.getDate()) {
+            startMonth += 1;
+            if (startMonth > 11) {
+              startMonth = 0;
+              startYear += 1;
+            }
+          }
+
+          // Ajusta o dia caso seja maior que o último dia do mês inicial
+          const lastDayOfStartMonth = getLastDayOfMonth(startYear, startMonth);
+          if (dayForFixedExpense > lastDayOfStartMonth) {
+              dayForFixedExpense = lastDayOfStartMonth;
           }
 
           const newExpense = {
@@ -489,6 +501,8 @@ export default function DespesaScreen({ navigation, route }) {
             id: Date.now().toString(),
             status: 'pending', // Novas despesas fixas são pendentes por padrão
             dueDayOfMonth: dayForFixedExpense, // Dia de vencimento fixo mensal
+            startMonth: startMonth,    // Adiciona mês inicial
+            startYear: startYear,      // Adiciona ano inicial
           };
           expenses.push(newExpense);
           Alert.alert('Sucesso', 'Despesa fixa adicionada com sucesso!');
