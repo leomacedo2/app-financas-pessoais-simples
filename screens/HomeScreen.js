@@ -284,11 +284,13 @@ export default function HomeScreen({ navigation }) {
           return;
         }
 
-        const createdAtDate = new Date(item.createdAt);
-        const createdAtMonthStart = new Date(createdAtDate.getFullYear(), createdAtDate.getMonth(), 1).getTime();
+        // Verifica se a despesa fixa já deve começar a ser exibida
+        const startDate = new Date(item.startYear || item.createdAt.getFullYear(), 
+                                 item.startMonth || item.createdAt.getMonth(), 1);
+        const targetDate = new Date(targetYear, targetMonth, 1);
 
-        // A despesa fixa só aparece se foi criada antes ou no mês atual de exibição
-        if (createdAtMonthStart <= displayMonthStartTimestamp) {
+        // Só exibe a despesa fixa se o mês/ano alvo for igual ou posterior ao mês/ano inicial
+        if (targetDate.getTime() >= startDate.getTime()) {
           let dayForFixedExpense = item.dueDayOfMonth || 1;
           const lastDayOfTargetMonth = getLastDayOfMonth(targetYear, targetMonth);
           
@@ -299,6 +301,10 @@ export default function HomeScreen({ navigation }) {
 
           const fixedDueDate = new Date(targetYear, targetMonth, dayForFixedExpense);
           
+          // Define se a despesa está atrasada baseado na data atual
+          const today = new Date();
+          const isDueDateBeforeToday = fixedDueDate < today;
+
           // Encontra o status específico para este mês/ano (se houver um status mensal)
           const monthYearKey = `${targetYear}-${targetMonth}`;
           const monthStatus = item.monthlyStatus?.find(
@@ -837,6 +843,19 @@ export default function HomeScreen({ navigation }) {
       const dueDate = parseDateString(formatDateForDisplay(new Date(expense.dueDate)));
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
+      // Se for uma despesa fixa, verifica se estamos no mês inicial
+      if (expense.paymentMethod === 'Fixa' && expense.startMonth !== undefined && expense.startYear !== undefined) {
+        const startDate = new Date(expense.startYear, expense.startMonth, expense.dueDayOfMonth || 1);
+        const firstMonth = startDate.getMonth() === dueDate.getMonth() && 
+                         startDate.getFullYear() === dueDate.getFullYear();
+        
+        // Se for o mês inicial e o dia de vencimento for menor que o dia atual,
+        // não mostra como atrasado, pois a despesa começa apenas no próximo mês
+        if (firstMonth && dueDate < today) {
+          return `Começa no próximo mês`;
+        }
+      }
 
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
