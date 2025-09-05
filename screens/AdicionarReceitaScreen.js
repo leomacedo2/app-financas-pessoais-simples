@@ -225,12 +225,24 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
 
       {/* Campo de input para o valor da receita, com teclado numérico */}
       <TextInput
-        style={commonStyles.input}
-        placeholder="Valor (R$)"
+        style={styles.currencyInput}
+        placeholder="R$ 0,00"
         keyboardType="numeric"
-        value={incomeValue}
-        // Permite apenas números, vírgulas e pontos, e substitui ponto por vírgula para formatação
-        onChangeText={(text) => setIncomeValue(text.replace(/[^0-9,.]/g, '').replace('.', ','))}
+        value={incomeValue ? `R$ ${incomeValue}` : ''}
+        onChangeText={(text) => {
+          // Remove tudo exceto números
+          const numbers = text.replace(/\D/g, '');
+          
+          // Converte para centavos (divide por 100 para ter 2 casas decimais)
+          const amount = (parseInt(numbers || '0') / 100).toFixed(2);
+          
+          // Formata sem o prefixo R$ para o estado
+          if (numbers) {
+            setIncomeValue(amount.replace('.', ','));
+          } else {
+            setIncomeValue('');
+          }
+        }}
       />
 
       {/* Componente de seleção de tipo (Fixo/Ganho) com botões */}
@@ -309,6 +321,22 @@ const styles = StyleSheet.create({
     ...commonStyles.container,
     paddingHorizontal: 20,
   },
+  // Estilo específico para o input de moeda
+  currencyInput: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'right',
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
   // Sobrescreve o estilo da label do picker para se alinhar ao design da tela
   pickerLabel: {
     ...commonStyles.pickerLabel, // Herda do commonStyles
@@ -317,3 +345,4 @@ const styles = StyleSheet.create({
     marginBottom: 10, // Espaçamento para os botões
   },
 });
+

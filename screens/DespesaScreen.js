@@ -638,11 +638,24 @@ export default function DespesaScreen({ navigation, route }) {
         />
 
         <TextInput
-          style={commonStyles.input}
-          placeholder="Valor (R$)"
+          style={styles.currencyInput}
+          placeholder="R$ 0,00"
           keyboardType="numeric"
-          value={expenseValue}
-          onChangeText={(text) => setExpenseValue(text.replace(/[^0-9,.]/g, '').replace('.', ','))}
+          value={expenseValue ? `R$ ${expenseValue}` : ''}
+          onChangeText={(text) => {
+            // Remove tudo exceto números
+            const numbers = text.replace(/\D/g, '');
+            
+            // Converte para centavos (divide por 100 para ter 2 casas decimais)
+            const amount = (parseInt(numbers || '0') / 100).toFixed(2);
+            
+            // Formata sem o prefixo R$ para o estado
+            if (numbers) {
+              setExpenseValue(amount.replace('.', ','));
+            } else {
+              setExpenseValue('');
+            }
+          }}
         />
 
         {/* Seletor/Exibição de método de pagamento */}
@@ -868,6 +881,21 @@ const styles = StyleSheet.create({
   },
   fixedExpenseDayContainer: {
     marginBottom: 15,
+  },
+  currencyInput: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'right',
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
   },
   noCardsMessageContainer: {
     backgroundColor: '#fff',
