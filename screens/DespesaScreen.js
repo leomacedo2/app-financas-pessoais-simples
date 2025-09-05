@@ -626,7 +626,7 @@ export default function DespesaScreen({ navigation, route }) {
   const daysInMonth = Array.from({ length: 31 }, (_, i) => String(i + 1));
 
   return (
-    <View style={[commonStyles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={commonStyles.title}>{isEditing ? "Editar Despesa" : "Adicionar Nova Despesa"}</Text>
 
@@ -867,11 +867,11 @@ export default function DespesaScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     ...commonStyles.container,
-    paddingHorizontal: 20,
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
+    paddingHorizontal: 20,
   },
   creditOptionsContainer: {
     marginBottom: 15,
