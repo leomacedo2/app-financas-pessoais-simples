@@ -145,24 +145,22 @@ export default function ReceitaScreen({ navigation }) {
    */
   const renderIncomeItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.incomeItem} // Estilo para o item individual da receita
-      onLongPress={() => handleLongPressIncome(item)} // Ativa o modal de ações com toque longo
+      style={styles.incomeItem}
+      onLongPress={() => handleLongPressIncome(item)}
     >
-      <Text style={styles.incomeName}>{item.name}</Text>
-      <View style={styles.incomeDetails}>
-        {/* Exibe o tipo da receita */}
-        <Text style={styles.incomeType}>{item.type === 'Fixo' ? 'Fixo' : 'Ganho Pontual'}</Text>
-        {/* Exibe o mês/ano para receitas do tipo 'Ganho' */}
-        {item.type === 'Ganho' && item.month !== undefined && item.year !== undefined && (
-          <Text style={styles.incomeDate}>
-            {/* Mês + 1 pois é 0-indexado em JavaScript */}
-            {`${(item.month + 1).toString().padStart(2, '0')}/${item.year}`}
-          </Text>
-        )}
+      <View style={styles.leftColumn}>
+        <Text style={styles.incomeName}>{item.name}</Text>
+        <View style={styles.incomeDetails}>
+          <Text style={styles.incomeType}>{item.type === 'Fixo' ? 'Receita Fixa' : 'Ganho Pontual'}</Text>
+          {item.type === 'Ganho' && item.month !== undefined && item.year !== undefined && (
+            <Text style={styles.incomeDate}>
+              • {`${(item.month + 1).toString().padStart(2, '0')}/${item.year}`}
+            </Text>
+          )}
+        </View>
       </View>
-      {/* Exibe o valor da receita formatado */}
       <Text style={styles.incomeValue}>
-        {`${item.value.toFixed(2).replace('.', ',')} R$`}
+        R$ {item.value.toFixed(2).replace('.', ',')}
       </Text>
     </TouchableOpacity>
   );
@@ -284,33 +282,36 @@ const styles = StyleSheet.create({
     elevation: 2,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+  },
+  leftColumn: {
+    flex: 1,
+    justifyContent: 'center',
   },
   incomeName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    flex: 2, // Ocupa mais espaço para o nome
+    marginBottom: 4,
   },
   incomeDetails: {
-    flex: 1.5, // Ajusta o espaço para tipo e data
-    alignItems: 'flex-start',
-    marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   incomeType: {
     fontSize: 14,
     color: '#666',
   },
   incomeDate: {
-    fontSize: 12,
-    color: '#888',
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
   },
   incomeValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#28a745', // Verde para receitas
-    flex: 1,
     textAlign: 'right',
+    marginLeft: 15,
   },
   // Estilo específico para o botão de adição flutuante (posição absoluta)
   addButton: {
