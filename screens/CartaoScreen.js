@@ -4,8 +4,14 @@
  * @file Tela para exibir e gerenciar os cartões cadastrados.
  * Permite ao usuário visualizar seus cartões, editar detalhes de um cartão
  * ou excluí-lo (exclusão suave). Suporta rolagem vertical se houver muitos cartões.
- *
- * Correção: Resolvido o erro "Text strings must be rendered within a <Text> component"
+ *const styles = StyleSheet.create({
+  container: {
+    ...commonStyles.container, // Herda o estilo base
+  },
+  listContent: {
+    paddingBottom: 80, // Espaço para o botão de adição flutuante
+    paddingHorizontal: 20, // Padding lateral específico para a lista de cartões
+  },reção: Resolvido o erro "Text strings must be rendered within a <Text> component"
  * garantindo que o título do modal e os textos dos botões sempre tenham um valor de string válido.
  * Os botões do modal de edição agora são empilhados, como solicitado.
  * O botão de adição flutuante agora é redondo, como em ReceitaScreen.
@@ -180,7 +186,7 @@ export default function CartaoScreen({ navigation }) {
 
   return (
     // Aplica o padding superior para respeitar a barra de notificação do dispositivo
-    <View style={[commonStyles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Título da tela, fixo no topo */}
       <Text style={commonStyles.title}>Meus Cartões</Text>
       

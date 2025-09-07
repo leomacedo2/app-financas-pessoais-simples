@@ -179,7 +179,7 @@ export default function ReceitaScreen({ navigation }) {
 
   return (
     // Aplica o padding superior para respeitar a barra de notificação do dispositivo
-    <View style={[commonStyles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={commonStyles.title}>Minhas Receitas</Text>
       {incomes.length > 0 ? (
         // Renderiza a lista de receitas se houver itens
@@ -262,7 +262,6 @@ const styles = StyleSheet.create({
   // Combina o container base dos estilos comuns com padding horizontal específico para esta tela
   container: {
     ...commonStyles.container,
-    paddingHorizontal: 20,
   },
   // Sobrescreve o título para marginBottom específico desta tela se necessário
   title: {
@@ -271,6 +270,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 80, // Espaço para o botão de adição flutuante
+    paddingHorizontal: 20,
   },
   incomeItem: {
     backgroundColor: '#ffffff',
