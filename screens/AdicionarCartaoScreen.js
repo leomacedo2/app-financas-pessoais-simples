@@ -117,7 +117,7 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
 
   return (
     // Aplica o padding superior para respeitar a barra de notificação do dispositivo
-    <View style={[commonStyles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* ScrollView para garantir que o formulário seja rolável */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Título da tela, dinâmico para edição ou adição */}
@@ -166,11 +166,11 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     ...commonStyles.container,
-    paddingHorizontal: 20, // Mantido padding horizontal
   },
   scrollContent: { // Estilo para o conteúdo rolável do formulário
     flexGrow: 1,
     paddingBottom: 20,
+    paddingHorizontal: 20, // Movido o padding horizontal para o conteúdo
   },
   // O título, input, pickerContainer, picker, pickerLabel, addButton, buttonText
   // já estão definidos em commonStyles.js e são importados via spread operator ou diretamente.
