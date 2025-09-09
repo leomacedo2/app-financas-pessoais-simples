@@ -167,12 +167,8 @@ const styles = StyleSheet.create({
   container: {
     ...commonStyles.container,
   },
-  scrollContent: { // Estilo para o conteúdo rolável do formulário
-    flexGrow: 1,
-    paddingBottom: 20,
-    paddingHorizontal: 20, // Movido o padding horizontal para o conteúdo
+  scrollContent: {
+    ...commonStyles.scrollContent,
   },
-  // O título, input, pickerContainer, picker, pickerLabel, addButton, buttonText
-  // já estão definidos em commonStyles.js e são importados via spread operator ou diretamente.
-  // Você pode sobrescrevê-los aqui se precisar de algo muito específico para esta tela.
+  // Outros estilos específicos desta tela podem ser adicionados aqui se necessário
 });

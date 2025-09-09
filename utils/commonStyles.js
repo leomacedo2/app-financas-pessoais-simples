@@ -24,6 +24,17 @@ const commonStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5', // Fundo cinza claro padrão
   },
+  // Estilo para o conteúdo scrollável, com padding horizontal padrão
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+    paddingHorizontal: 20, // Padding horizontal padrão para todas as telas
+  },
+  // Estilo para o conteúdo de listas, com padding horizontal padrão
+  listContent: {
+    paddingBottom: 80, // Espaço para o botão de adição flutuante
+    paddingHorizontal: 20, // Padding horizontal padrão para todas as telas
+  },
   // Estilo para containers de carregamento, centralizando o indicador de atividade.
   loadingContainer: {
     flex: 1,
