@@ -1,6 +1,6 @@
 // screens/AdicionarReceitaScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets
@@ -212,11 +212,12 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
   return (
     // Aplica o padding superior para respeitar a barra de notificação do dispositivo
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Título da tela, dinâmico para edição ou adição */}
-      <Text style={commonStyles.title}>{isEditing ? "Editar Receita" : "Adicionar Nova Receita"}</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Título da tela, dinâmico para edição ou adição */}
+        <Text style={commonStyles.title}>{isEditing ? "Editar Receita" : "Adicionar Nova Receita"}</Text>
 
-      {/* Campo de input para o nome da receita */}
-      <TextInput
+        {/* Campo de input para o nome da receita */}
+        <TextInput
         style={commonStyles.input}
         placeholder="Nome da Receita (Ex: Salário, Venda de item)"
         value={incomeName}
@@ -306,11 +307,12 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
         disabled={savingIncome} // Desabilita o botão enquanto estiver salvando
       >
         {savingIncome ? (
-          <ActivityIndicator color="#fff" /> // Mostra um spinner enquanto salva
+          <ActivityIndicator color="#fff" />
         ) : (
           <Text style={commonStyles.buttonText}>{isEditing ? "Salvar Alterações" : "Adicionar Receita"}</Text>
         )}
       </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -319,7 +321,9 @@ const styles = StyleSheet.create({
   // Combina o container base dos estilos comuns com padding horizontal específico para esta tela
   container: {
     ...commonStyles.container,
-    paddingHorizontal: 20,
+  },
+  scrollContent: {
+    ...commonStyles.scrollContent,
   },
   // Estilo específico para o input de moeda
   currencyInput: {

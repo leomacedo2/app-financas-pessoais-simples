@@ -9,8 +9,7 @@
     ...commonStyles.container, // Herda o estilo base
   },
   listContent: {
-    paddingBottom: 80, // Espaço para o botão de adição flutuante
-    paddingHorizontal: 20, // Padding lateral específico para a lista de cartões
+    ...commonStyles.listContent,
   },reção: Resolvido o erro "Text strings must be rendered within a <Text> component"
  * garantindo que o título do modal e os textos dos botões sempre tenham um valor de string válido.
  * Os botões do modal de edição agora são empilhados, como solicitado.

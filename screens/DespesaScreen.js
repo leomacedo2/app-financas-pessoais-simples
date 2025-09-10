@@ -869,9 +869,7 @@ const styles = StyleSheet.create({
     ...commonStyles.container,
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    ...commonStyles.scrollContent,
   },
   creditOptionsContainer: {
     marginBottom: 15,

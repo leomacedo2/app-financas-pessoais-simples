@@ -1305,6 +1305,10 @@ const styles = StyleSheet.create({
   container: {
     ...commonStyles.container,
   },
+  monthPage: {
+    width: width,
+    ...commonStyles.scrollContent,
+  },
   topButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',

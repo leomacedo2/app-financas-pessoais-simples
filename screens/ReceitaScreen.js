@@ -267,8 +267,7 @@ const styles = StyleSheet.create({
     marginBottom: 20, // Título da lista tem menos espaço que os formulários
   },
   listContent: {
-    paddingBottom: 80, // Espaço para o botão de adição flutuante
-    paddingHorizontal: 20,
+    ...commonStyles.listContent,
   },
   incomeItem: {
     backgroundColor: '#ffffff',
