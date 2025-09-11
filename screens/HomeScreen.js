@@ -912,17 +912,18 @@ export default function HomeScreen({ navigation }) {
                 <TouchableOpacity 
                   key={String(item.id)} 
                   style={styles.debitItemRowAdjusted} // Estilo ajustado para espaçamento vertical
+                  onPress={() => handleTogglePaidStatus(item.id)} // Toque simples para alternar status
                   onLongPress={() => handleEditExpense(item)} // Toque longo para editar a despesa
                   activeOpacity={0.7} // Adiciona um feedback visual ao toque
                 >
-                  {/* Checkbox para marcar/desmarcar despesa como paga */}
-                  <TouchableOpacity onPress={() => handleTogglePaidStatus(item.id)} style={styles.checkboxContainerAdjusted}>
+                  {/* Checkbox (não mais interativo) */}
+                  <View style={styles.checkboxContainerAdjusted}>
                     <Ionicons
                       name={item.status === 'paid' ? 'checkbox' : 'square-outline'} 
                       size={24}
                       color={item.status === 'paid' ? '#28a745' : '#6c757d'} 
                     />
-                  </TouchableOpacity>
+                  </View>
 
                   <View style={styles.descriptionAndFooterContainer}>
                     <Text style={styles.debitText}>
