@@ -892,11 +892,16 @@ export default function HomeScreen({ navigation }) {
 
     return (
       <View style={styles.monthPage}>
-        <View style={[
-          styles.section,
-          isSystemCurrentMonth && styles.currentMonthHighlight // Aplica destaque se for o mês atual
-        ]}>
-          <Text style={styles.sectionTitle}>{String(monthName)} {String(year)}</Text>
+        <View style={styles.section}>
+          {/* Título do mês com ícone quando for o mês atual */}
+          <View style={[
+            styles.monthTitleContainer,
+            isSystemCurrentMonth && styles.currentMonthTitleContainer
+          ]}>
+            <Text style={isSystemCurrentMonth ? styles.currentMonthTitle : styles.regularMonthTitle}>
+              {String(monthName)} {String(year)}
+            </Text>
+          </View>
 
           {/* Cabeçalho da tabela de despesas com colunas para checkbox, descrição e valor */}
           <View style={styles.tableHeader}>
@@ -911,7 +916,10 @@ export default function HomeScreen({ navigation }) {
               {expenses.map((item) => (
                 <TouchableOpacity 
                   key={String(item.id)} 
-                  style={styles.debitItemRowAdjusted} // Estilo ajustado para espaçamento vertical
+                  style={[
+                    styles.debitItemRowAdjusted, // Estilo base
+                    item.status === 'paid' && styles.paidExpenseRow // Aplica fundo verde suave se estiver paga
+                  ]}
                   onPress={() => handleTogglePaidStatus(item.id)} // Toque simples para alternar status
                   onLongPress={() => handleEditExpense(item)} // Toque longo para editar a despesa
                   activeOpacity={0.7} // Adiciona um feedback visual ao toque
@@ -1309,6 +1317,35 @@ const styles = StyleSheet.create({
   monthPage: {
     width: width,
     ...commonStyles.scrollContent,
+  },
+  // Estilos para títulos dos meses
+  monthTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+  },
+  // Container especial para o mês atual (apenas muda a cor de fundo)
+  currentMonthTitleContainer: {
+    backgroundColor: '#e3f2fd', // Azul bem suave
+  },
+  currentMonthTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1976d2', // Azul um pouco mais escuro para contraste
+  },
+  regularMonthTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  // Estilo para despesas pagas
+  paidExpenseRow: {
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
   },
   topButtonsContainer: {
     flexDirection: 'row',
