@@ -830,6 +830,56 @@ export default function HomeScreen({ navigation }) {
   }, [allExpenses]); // Depende de `allExpenses` para obter o estado mais recente
 
   /**
+   * Calcula a cor de fundo baseada no status e data de vencimento da despesa
+   * @param {object} expense - O objeto de despesa
+   * @returns {string} Código da cor em hexadecimal
+   */
+  const getExpenseBackgroundColor = (expense) => {
+    // Se já está paga, retorna verde suave
+    if (expense.status === 'paid') {
+      return '#e8f5e9'; // Verde suave
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = parseDateString(formatDateForDisplay(new Date(expense.dueDate)));
+    const diffDays = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+
+    // Se está atrasada
+    if (diffDays < 0) {
+      return '#ef9a9a'; // Vermelho médio para atrasadas - mais suave que antes, mas ainda destacado
+    }
+
+    // Se vence hoje
+    if (diffDays === 0) {
+      return '#ffcdd2'; // Vermelho médio (anterior das atrasadas)
+    }
+
+    // Se vence amanhã
+    if (diffDays === 1) {
+      return '#ffebee'; // Vermelho suave (anterior do "vence hoje")
+    }
+
+    // Se vence em até 4 dias
+    if (diffDays <= 4) {
+      return '#fff3e0'; // Laranja bem suave
+    }
+
+    // Se vence em até 8 dias
+    if (diffDays <= 8) {
+      return '#fff8e1'; // Amarelo suave
+    }
+
+    // Se vence em até 16 dias
+    if (diffDays <= 16) {
+      return '#fffde7'; // Amarelo mais suave ainda
+    }
+
+    // Se vence depois de 16 dias
+    return '#ffffff'; // Branco
+  };
+
+  /**
    * Retorna o texto de status formatado para uma despesa, considerando sua data de vencimento.
    * Pode ser "Pago", "Vence Hoje", "Vence Amanhã", "Atrasado" ou "Vence".
    * @param {object} expense - O objeto de despesa.
@@ -918,7 +968,7 @@ export default function HomeScreen({ navigation }) {
                   key={String(item.id)} 
                   style={[
                     styles.debitItemRowAdjusted, // Estilo base
-                    item.status === 'paid' && styles.paidExpenseRow // Aplica fundo verde suave se estiver paga
+                    { backgroundColor: getExpenseBackgroundColor(item) } // Aplica cor condicional
                   ]}
                   onPress={() => handleTogglePaidStatus(item.id)} // Toque simples para alternar status
                   onLongPress={() => handleEditExpense(item)} // Toque longo para editar a despesa
