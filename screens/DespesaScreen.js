@@ -302,6 +302,8 @@ export default function DespesaScreen({ navigation, route }) {
         value: value,
         paymentMethod: isEditing ? route.params?.expenseToEdit?.paymentMethod : paymentMethod, // Mantém o método original em edição
         deletedAt: currentExpenseDeletedAt,
+        status: 'pending', // Define o status como pendente por padrão
+        paidAt: null, // Inicializa paidAt como null já que está pendente
       };
 
       // --- Lógica para Edição de Despesa Existente ---
