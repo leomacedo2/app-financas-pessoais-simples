@@ -746,14 +746,22 @@ export default function HomeScreen({ navigation }) {
     });
 
     if (!originalExpense) {
-      console.warn(`[DEBUG - handleTogglePaidStatus]: Despesa com ID ${expenseId} não encontrada.`);
+      console.warn(`[DEBUG - handleTogglePaidStatus]: Despesa com ID ${expenseId} não encontrada no array de despesas.`);
+      console.warn(`[DEBUG - handleTogglePaidStatus]: ID Base: ${baseId}, Sufixos: ${suffixes.join(', ')}`);
       return;
     }
 
-    console.log(`[DEBUG - handleTogglePaidStatus]: Encontrada despesa tipo ${originalExpense.paymentMethod}, ID: ${expenseId}`);
+    console.log(`[DEBUG - handleTogglePaidStatus]: Despesa encontrada:`, {
+      tipo: originalExpense.paymentMethod,
+      id: expenseId,
+      baseId,
+      descricao: originalExpense.description,
+      status: originalExpense.status,
+      valor: originalExpense.value
+    });
 
     if (expenseIndex === -1) {
-      console.warn(`[DEBUG - handleTogglePaidStatus]: Despesa com ID ${expenseId} não encontrada.`);
+      console.warn(`[DEBUG - handleTogglePaidStatus]: Índice da despesa não encontrado para ID ${expenseId}`);
       return;
     }
 
@@ -802,11 +810,18 @@ export default function HomeScreen({ navigation }) {
         expenseToUpdate.status = 'pending';
         expenseToUpdate.paidAt = null;
       }
-      console.log(`[DEBUG - handleTogglePaidStatus]: Atualizando parcela ${expenseToUpdate.installmentNumber} para status: ${expenseToUpdate.status}`);
+      console.log(`[DEBUG - handleTogglePaidStatus]: Atualizando parcela de crédito:`, {
+        parcela: expenseToUpdate.installmentNumber,
+        total: expenseToUpdate.totalInstallments,
+        novoStatus: expenseToUpdate.status,
+        valor: expenseToUpdate.value,
+        pago: expenseToUpdate.paidAt ? 'Sim' : 'Não'
+      });
     }
     // Para despesas normais (débito)
     else {
       // Alterna o status e a data de pagamento
+      const statusAnterior = expenseToUpdate.status;
       if (expenseToUpdate.status === 'pending') {
         expenseToUpdate.status = 'paid';
         expenseToUpdate.paidAt = new Date().toISOString();
@@ -814,10 +829,18 @@ export default function HomeScreen({ navigation }) {
         expenseToUpdate.status = 'pending';
         expenseToUpdate.paidAt = null;
       }
+      console.log(`[DEBUG - handleTogglePaidStatus]: Atualizando despesa de ${expenseToUpdate.paymentMethod}:`, {
+        descricao: expenseToUpdate.description,
+        statusAnterior,
+        novoStatus: expenseToUpdate.status,
+        valor: expenseToUpdate.value,
+        data: expenseToUpdate.dueDate
+      });
     }
 
     updatedExpenses[expenseIndex] = expenseToUpdate; // Atualiza a despesa no array
     setAllExpenses(updatedExpenses); // Atualiza o estado local com as despesas modificadas
+    console.log('[DEBUG - handleTogglePaidStatus]: Estado local atualizado com sucesso');
 
     // Persiste a mudança no AsyncStorage
     try {
