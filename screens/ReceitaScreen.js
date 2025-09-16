@@ -189,7 +189,10 @@ export default function ReceitaScreen({ navigation }) {
         />
       ) : (
         // Exibe uma mensagem se não houver receitas
-        <Text style={commonStyles.noItemsText}>Nenhuma receita adicionada ainda. Adicione uma!</Text>
+        <View style={commonStyles.container}>
+          <Text style={commonStyles.noItemsText}>Nenhuma receita adicionada ainda.</Text>
+          <Text style={commonStyles.noItemsText}>Adicione uma!</Text>
+        </View>
       )}
 
       {/* Botão flutuante para adicionar nova receita */}

@@ -199,7 +199,10 @@ export default function CartaoScreen({ navigation }) {
         />
       ) : (
         // Exibe uma mensagem se não houver cartões
-        <Text style={commonStyles.noItemsText}>Nenhum cartão adicionado ainda. Adicione um!</Text>
+        <View style={commonStyles.container}>
+          <Text style={commonStyles.noItemsText}>Nenhum cartão adicionado ainda.</Text>
+          <Text style={commonStyles.noItemsText}>Adicione um!</Text>
+        </View>
       )}
 
       {/* Botão flutuante para adicionar novo cartão - AGORA COM ESTILO CIRCULAR */}
