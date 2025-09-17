@@ -216,13 +216,17 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
         {/* Título da tela, dinâmico para edição ou adição */}
         <Text style={commonStyles.title}>{isEditing ? "Editar Receita" : "Adicionar Nova Receita"}</Text>
 
-        {/* Campo de input para o nome da receita */}
-        <TextInput
-        style={commonStyles.input}
-        placeholder="Nome da Receita (Ex: Salário, Venda de item)"
-        value={incomeName}
-        onChangeText={setIncomeName}
-      />
+        {/* Rótulo e campo de input para o nome da receita */}
+        <View style={commonStyles.inputContainer}>
+          <Text style={commonStyles.pickerLabel}>Nome da Receita:</Text>
+          <TextInput
+            style={commonStyles.input}
+            placeholder="Ex: Salário, Venda de item"
+            placeholderTextColor="#bbb" // Cor mais clara para o placeholder
+            value={incomeName}
+            onChangeText={setIncomeName}
+          />
+        </View>
 
       {/* Campo de input para o valor da receita, com teclado numérico */}
       <TextInput
