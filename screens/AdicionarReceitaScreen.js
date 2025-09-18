@@ -229,26 +229,33 @@ export default function AdicionarReceitaScreen({ navigation, route }) {
         </View>
 
       {/* Campo de input para o valor da receita, com teclado numérico */}
-      <TextInput
-        style={styles.currencyInput}
-        placeholder="R$ 0,00"
-        keyboardType="numeric"
-        value={incomeValue ? `R$ ${incomeValue}` : ''}
-        onChangeText={(text) => {
-          // Remove tudo exceto números
-          const numbers = text.replace(/\D/g, '');
-          
-          // Converte para centavos (divide por 100 para ter 2 casas decimais)
-          const amount = (parseInt(numbers || '0') / 100).toFixed(2);
-          
-          // Formata sem o prefixo R$ para o estado
-          if (numbers) {
-            setIncomeValue(amount.replace('.', ','));
-          } else {
-            setIncomeValue('');
-          }
-        }}
-      />
+      <View style={commonStyles.inputContainer}>
+        <Text style={commonStyles.pickerLabel}>Valor da Receita:</Text>
+        <View style={styles.currencyInputContainer}>
+          <Text style={styles.currencySymbol}>R$</Text>
+          <TextInput
+            style={styles.currencyInput}
+            placeholder="0,00"
+            placeholderTextColor="#bbb"
+            keyboardType="numeric"
+            value={incomeValue}
+            onChangeText={(text) => {
+              // Remove tudo exceto números
+              const numbers = text.replace(/\D/g, '');
+              
+              // Converte para centavos (divide por 100 para ter 2 casas decimais)
+              const amount = (parseInt(numbers || '0') / 100).toFixed(2);
+              
+              // Formata sem o prefixo R$ para o estado
+              if (numbers) {
+                setIncomeValue(amount.replace('.', ','));
+              } else {
+                setIncomeValue('');
+              }
+            }}
+          />
+        </View>
+      </View>
 
       {/* Componente de seleção de tipo (Fixo/Ganho) com botões */}
       <View style={commonStyles.typeSelectionContainer}>
@@ -329,21 +336,34 @@ const styles = StyleSheet.create({
   scrollContent: {
     ...commonStyles.scrollContent,
   },
-  // Estilo específico para o input de moeda
-  currencyInput: {
+  // Estilos para o input de moeda
+  currencyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 15,
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'right',
     marginBottom: 15,
+    paddingHorizontal: 15,
+    height: 60,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
+  },
+  currencySymbol: {
+    fontSize: 24,
+    color: '#495057',
+    marginRight: 8,
+    fontWeight: '500',
+  },
+  currencyInput: {
+    flex: 1,
+    fontSize: 24,
+    color: '#495057',
+    fontWeight: 'bold',
+    textAlign: 'left',
+    padding: 0, // Remove padding interno do input
   },
   // Sobrescreve o estilo da label do picker para se alinhar ao design da tela
   pickerLabel: {
