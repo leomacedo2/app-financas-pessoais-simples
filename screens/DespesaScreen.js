@@ -632,33 +632,39 @@ export default function DespesaScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={commonStyles.title}>{isEditing ? "Editar Despesa" : "Adicionar Nova Despesa"}</Text>
 
-        <TextInput
-          style={commonStyles.input}
-          placeholder="Descrição da Despesa (Ex: Supermercado, Aluguel)"
-          value={expenseName}
-          onChangeText={setExpenseName}
-        />
+        <View style={commonStyles.inputContainer}>
+          <Text style={commonStyles.pickerLabel}>Nome da Despesa:</Text>
+          <TextInput
+            style={commonStyles.input}
+            placeholder="Ex: Supermercado, Aluguel"
+            placeholderTextColor="#bbb"
+            value={expenseName}
+            onChangeText={setExpenseName}
+          />
+        </View>
 
-        <TextInput
-          style={styles.currencyInput}
-          placeholder="R$ 0,00"
-          keyboardType="numeric"
-          value={expenseValue ? `R$ ${expenseValue}` : ''}
-          onChangeText={(text) => {
-            // Remove tudo exceto números
-            const numbers = text.replace(/\D/g, '');
-            
-            // Converte para centavos (divide por 100 para ter 2 casas decimais)
-            const amount = (parseInt(numbers || '0') / 100).toFixed(2);
-            
-            // Formata sem o prefixo R$ para o estado
-            if (numbers) {
-              setExpenseValue(amount.replace('.', ','));
-            } else {
-              setExpenseValue('');
-            }
-          }}
-        />
+        <View style={commonStyles.inputContainer}>
+          <Text style={commonStyles.pickerLabel}>Valor da Despesa:</Text>
+          <View style={styles.currencyInputContainer}>
+            <Text style={styles.currencySymbol}>R$</Text>
+            <TextInput
+              style={styles.currencyInput}
+              placeholder="0,00"
+              placeholderTextColor="#bbb"
+              keyboardType="numeric"
+              value={expenseValue}
+              onChangeText={text => {
+                const numbers = text.replace(/[^\d]/g, '');
+                if (numbers) {
+                  const amount = (parseFloat(numbers) / 100).toFixed(2);
+                  setExpenseValue(amount.replace('.', ','));
+                } else {
+                  setExpenseValue('');
+                }
+              }}
+            />
+          </View>
+        </View>
 
         {/* Seletor/Exibição de método de pagamento */}
         <View style={commonStyles.typeSelectionContainer}>
@@ -882,20 +888,31 @@ const styles = StyleSheet.create({
   fixedExpenseDayContainer: {
     marginBottom: 15,
   },
-  currencyInput: {
+  currencyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'right',
-    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
+  },
+  currencySymbol: {
+    fontSize: 24,
+    color: '#333',
+    marginRight: 8,
+    fontWeight: 'bold',
+  },
+  currencyInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'left',
+    padding: 0,
   },
   noCardsMessageContainer: {
     backgroundColor: '#fff',
