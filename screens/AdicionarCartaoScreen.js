@@ -123,13 +123,17 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
         {/* Título da tela, dinâmico para edição ou adição */}
         <Text style={commonStyles.title}>{isEditing ? "Editar Cartão" : "Adicionar Novo Cartão"}</Text>
 
-        {/* Campo de input para o apelido do cartão */}
-        <TextInput
-          style={commonStyles.input}
-          placeholder="Apelido do Cartão (Ex: Cartão Nubank, Cartão Viagem)"
-          value={cardAlias}
-          onChangeText={setCardAlias}
-        />
+        {/* Rótulo e campo de input para o nome da receita */}
+        <View style={commonStyles.inputContainer}>
+          <Text style={commonStyles.pickerLabel}>Apelido do Cartão:</Text>
+          <TextInput
+            style={commonStyles.input}
+            placeholder="Ex: Cartão Nubank, Cartão Mastercard"
+            placeholderTextColor="#bbb" // Cor mais clara para o placeholder
+            value={cardAlias}
+            onChangeText={setCardAlias}
+          />
+        </View>
 
         {/* Seletor para o dia de vencimento da fatura */}
         <View style={commonStyles.pickerContainer}>
