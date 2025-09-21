@@ -56,8 +56,8 @@ function ReceitaNavigator() {
  * Componente que define a pilha de navegação para a aba "Despesa".
  * Agora permite navegar para a DespesaScreen e passar parâmetros para edição.
  */
-const DespesaStack = createNativeStackNavigator(); // NOVO: Pilha para as despesas
-function DespesaNavigator() { // NOVO: Componente navegador de despesas
+const DespesaStack = createNativeStackNavigator(); // Pilha para as despesas
+function DespesaNavigator() { // Componente navegador de despesas
   return (
     <DespesaStack.Navigator screenOptions={{ headerShown: false }}>
       {/* Tela principal de despesas, pode ser usada para adicionar ou editar */}
@@ -139,7 +139,7 @@ function HomeTabs() {
         options={{ tabBarLabel: 'Receita' }} // SIMPLIFICADO: Apenas a string 'Receita'
       />
       <Tab.Screen
-        name="DespesaTab" // NOVO: Usando o DespesaNavigator para esta aba
+        name="DespesaTab" // Usando o DespesaNavigator para esta aba
         component={DespesaNavigator}
         options={{ tabBarLabel: 'Despesa' }} // SIMPLIFICADO: Apenas a string 'Despesa'
       />
