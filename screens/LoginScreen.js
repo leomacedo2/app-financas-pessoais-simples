@@ -10,8 +10,11 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Button } from 'react-native'; // Usando Button por sua preferência
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'; // Usando Button por sua preferência
 import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets para lidar com a barra de status
+
+// Importa os estilos comuns
+import commonStyles from '../utils/commonStyles';
 
 export default function LoginScreen({ navigation }) {
   // Obtém os insets da área segura do dispositivo (ex: altura da barra de status no iOS, notch)
@@ -36,8 +39,9 @@ export default function LoginScreen({ navigation }) {
       <Text style={styles.titulo}>💰 Finanças Simples</Text>
       
       {/* Botão "Entrar" */}
-      {/* Usando o componente Button do React Native */}
-      <Button title="Entrar" onPress={fazerLogin} />
+      <TouchableOpacity style={commonStyles.loginButton} onPress={fazerLogin}>
+        <Text style={commonStyles.loginButtonText}>Entrar</Text>
+      </TouchableOpacity>
     </View>
   );
 }
