@@ -10,10 +10,10 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'; // Usando Button por sua preferência
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'; // Importa componentes básicos do React Native
 import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets para lidar com a barra de status
 
-// Importa os estilos comuns
+// Importa os estilos comuns entre as telas
 import commonStyles from '../utils/commonStyles';
 
 export default function LoginScreen({ navigation }) {

@@ -342,11 +342,11 @@ const commonStyles = StyleSheet.create({
     fontWeight: '600',
   },
     titleText: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: 'bold',
     color: '#007bff',          // azul principal
     textAlign: 'center',
-    marginBottom: 25,
+    marginBottom: 100,
     textShadowColor: 'rgba(0, 0, 0, 0.25)', // sombra suave
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
