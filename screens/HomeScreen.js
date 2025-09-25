@@ -31,6 +31,9 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 // Obtém a largura da tela do dispositivo para configurar a rolagem paginada do FlatList
 const { width } = Dimensions.get('window');
 
+// Constante criada para controlar a exibição dos botões de geração de dados de teste
+const mostrarBotoesTeste = false;
+
 /**
  * Converte uma string de data no formato "DD/MM/AAAA" para um objeto Date.
  * Essencial para manipular e comparar datas corretamente.
@@ -1201,6 +1204,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {mostrarBotoesTeste && (
       <View style={styles.topButtonsContainer}>
         <TouchableOpacity onPress={clearAllData} style={styles.clearDataButton}>
           <Text style={styles.clearDataButtonText}>Limpar Dados (Teste)</Text>
@@ -1209,6 +1213,7 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.generateRandomButtonText}>Gerar Despesas Aleatórias</Text>
         </TouchableOpacity>
       </View>
+    )}
 
       {/* FlatList horizontal para exibir os meses paginados */}
       <FlatList
