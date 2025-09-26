@@ -4,12 +4,6 @@
  * @file Arquivo principal do aplicativo, responsável pela configuração da navegação (React Navigation).
  * Define as pilhas de navegação (Stack Navigators) e o navegador de abas (Bottom Tab Navigator).
  *
- * CORREÇÃO FINAL PARA WARNING "Text strings must be rendered within a <Text> component":
- * As `tabBarLabel`s do `Tab.Navigator` foram simplificadas para receberem diretamente uma string.
- * O React Navigation é projetado para envolver essas strings em `<Text>` internamente,
- * evitando problemas de renderização que podem ocorrer com o uso de funções anônimas
- * retornando `<Text>` explicitamente.
- *
  * ATUALIZAÇÃO PARA EDIÇÃO DE DESPESAS:
  * Criado um 'DespesaNavigator' (Stack Navigator) para a aba de Despesas.
  * Isso permite que a 'DespesaScreen' atue como uma tela que pode receber parâmetros
