@@ -36,7 +36,7 @@ export default function LoginScreen({ navigation }) {
     // para evitar que o conteúdo fique atrás da barra de status do sistema.
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Título do aplicativo */}
-      <Text style={commonStyles.titleText}>💰 Finanças Simples</Text>
+      <Text style={styles.titleText}>💰 Finanças Simples</Text>
       
       {/* Botão "Entrar" */}
       <TouchableOpacity style={commonStyles.loginButton} onPress={fazerLogin}>
@@ -68,5 +68,14 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#888',
   },
-
+  titleText: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#007bff',          // azul principal
+    textAlign: 'center',
+    marginBottom: 100,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)', // sombra suave
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
 });

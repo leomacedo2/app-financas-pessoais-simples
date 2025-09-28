@@ -341,16 +341,6 @@ const commonStyles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-    titleText: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#007bff',          // azul principal
-    textAlign: 'center',
-    marginBottom: 100,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)', // sombra suave
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
 });
 
 export default commonStyles;
