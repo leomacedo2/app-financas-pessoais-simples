@@ -39,7 +39,7 @@ export default function LoginScreen({ navigation }) {
       <Text style={styles.titleText}>💰 Finanças Simples</Text>
       
       {/* Botão "Entrar" */}
-      <TouchableOpacity style={commonStyles.loginButton} onPress={fazerLogin}>
+      <TouchableOpacity style={styles.loginButton} onPress={fazerLogin}>
         <Text style={commonStyles.loginButtonText}>Entrar</Text>
       </TouchableOpacity>
 
@@ -77,5 +77,18 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.25)', // sombra suave
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
+  },
+  loginButton: {
+    backgroundColor: '#28a745', // Verde sucesso
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 25, // mais arredondado
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });

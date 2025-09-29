@@ -323,19 +323,6 @@ const commonStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  loginButton: {
-  backgroundColor: '#28a745', // Verde sucesso
-  paddingVertical: 15,
-  paddingHorizontal: 40,
-  borderRadius: 25, // mais arredondado
-  alignItems: 'center',
-  justifyContent: 'center',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 3 },
-  shadowOpacity: 0.3,
-  shadowRadius: 4,
-  elevation: 5,
-  },
   loginButtonText: {
     color: '#fff',
     fontSize: 18,
