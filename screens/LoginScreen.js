@@ -40,7 +40,7 @@ export default function LoginScreen({ navigation }) {
       
       {/* Botão "Entrar" */}
       <TouchableOpacity style={styles.loginButton} onPress={fazerLogin}>
-        <Text style={commonStyles.loginButtonText}>Entrar</Text>
+        <Text style={styles.loginButtonText}>Entrar</Text>
       </TouchableOpacity>
 
       {/* Botão Dev */}
@@ -50,7 +50,7 @@ export default function LoginScreen({ navigation }) {
           console.log('Botão Dev pressionado');
           alert('Funcionalidade de desenvolvedor ainda não implementada.')
         }}>
-        <Text style={commonStyles.loginButtonText}>Dev</Text>
+        <Text style={styles.loginButtonText}>Dev</Text>
         </TouchableOpacity>
     </View>
   );
@@ -90,5 +90,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
 });

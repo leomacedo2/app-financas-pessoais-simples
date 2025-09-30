@@ -323,11 +323,6 @@ const commonStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
 });
 
 export default commonStyles;
