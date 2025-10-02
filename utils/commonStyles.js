@@ -312,17 +312,23 @@ const commonStyles = StyleSheet.create({
     shadowRadius: 1.41,
     elevation: 2,
   },
-  statusToggleLabel: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: 'bold',
-  },
+
+
+  // statusToggleLabel: {
+  //   fontSize: 16,
+  //   color: '#333',
+  //   fontWeight: 'bold',
+  // },
+
+
   // NOVO ESTILO PARA TEXTO DE VALOR TOTAL (HomeScreen)
   // totalValueText: {
   //   fontSize: 18,
   //   fontWeight: 'bold',
   //   color: '#333',
   // },
+
+  
 });
 
 export default commonStyles;
