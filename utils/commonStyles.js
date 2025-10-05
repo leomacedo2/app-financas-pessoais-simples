@@ -314,11 +314,11 @@ const commonStyles = StyleSheet.create({
   },
 
 
-  // statusToggleLabel: {
-  //   fontSize: 16,
-  //   color: '#333',
-  //   fontWeight: 'bold',
-  // },
+  statusToggleLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: 'bold',
+  },
 
 
   // NOVO ESTILO PARA TEXTO DE VALOR TOTAL (HomeScreen)
