@@ -322,11 +322,11 @@ const commonStyles = StyleSheet.create({
 
 
   // NOVO ESTILO PARA TEXTO DE VALOR TOTAL (HomeScreen)
-  // totalValueText: {
-  //   fontSize: 18,
-  //   fontWeight: 'bold',
-  //   color: '#333',
-  // },
+  totalValueText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
 
 
 });
