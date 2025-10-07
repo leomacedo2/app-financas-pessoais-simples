@@ -672,10 +672,10 @@ export default function HomeScreen({ navigation }) {
   const currentDisplayedMonthExpenses = getExpensesForMonth(currentDisplayedMonthDate, allExpenses, true);
   
   // Calcula o total das despesas do mês atualmente exibido
-  const totalDespesasDisplayedMonth = currentDisplayedMonthExpenses.reduce((sum, item) => sum + item.value, 0);
+  const currentMonthTotalExpense = currentDisplayedMonthExpenses.reduce((sum, item) => sum + item.value, 0);
 
   // Calcula o valor final (Receita Total - Despesa Total) para o mês atualmente exibido
-  const valorFinalDisplayedMonth = currentMonthTotalIncome - totalDespesasDisplayedMonth;
+  const valorFinalDisplayedMonth = currentMonthTotalIncome - currentMonthTotalExpense;
 
   /**
    * Handler para navegar para a tela de edição de despesa.
@@ -1240,6 +1240,12 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.summaryLabel}>Receita total:</Text>
           <Text style={styles.summaryValue}>
             {String(currentMonthTotalIncome.toFixed(2)).replace('.', ',') + ' R$'}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Despesas totais:</Text>
+          <Text style={[styles.summaryValue, { color: '#dc3545' }]}>
+            {String(currentMonthTotalExpense.toFixed(2)).replace('.', ',') + ' R$'}
           </Text>
         </View>
         <View style={styles.summaryRow}>
