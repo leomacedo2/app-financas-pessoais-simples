@@ -1243,13 +1243,13 @@ export default function HomeScreen({ navigation }) {
           </Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Despesas totais:</Text>
+          <Text style={styles.summaryLabel}>Despesas pendentes:</Text>
           <Text style={[styles.summaryValue, { color: '#dc3545' }]}>
             {String(currentMonthTotalExpense.toFixed(2)).replace('.', ',') + ' R$'}
           </Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Valor final:</Text>
+          <Text style={styles.summaryLabel}>Saldo:</Text>
           {/* Altera a cor do valor final com base se é positivo ou negativo */}
           <Text style={[styles.summaryValue, valorFinalDisplayedMonth < 0 ? styles.negativeValue : styles.positiveValue]}>
             {String(valorFinalDisplayedMonth.toFixed(2)).replace('.', ',') + ' R$'}
