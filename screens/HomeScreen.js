@@ -1243,7 +1243,7 @@ export default function HomeScreen({ navigation }) {
           </Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Despesas pendentes:</Text>
+          <Text style={styles.summaryLabel}>Despesas:</Text>
           <Text style={[styles.summaryValue, { color: '#dc3545' }]}>
             {String(currentMonthTotalExpense.toFixed(2)).replace('.', ',') + ' R$'}
           </Text>
