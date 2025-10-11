@@ -14,8 +14,11 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 export default function ReceitaScreen({ navigation }) {
   const insets = useSafeAreaInsets(); // Obter os insets da área segura
 
-  const [loadingApp, setLoadingApp] = useState(true);
+  // Estados relacionados a dados
   const [incomes, setIncomes] = useState([]);
+  const [loadingApp, setLoadingApp] = useState(true);
+  
+  // Estados relacionados ao modal de ações
   const [isActionModalVisible, setIsActionModalVisible] = useState(false);
   const [selectedIncome, setSelectedIncome] = useState(null); // Para guardar a receita selecionada
 
@@ -64,6 +67,7 @@ export default function ReceitaScreen({ navigation }) {
     }, [loadIncomes]) // Depende de loadIncomes para ser reexecutado se loadIncomes mudar
   );
 
+  // Handlers do Modal
   /**
    * Lida com o toque longo em um item da receita, abrindo o modal de ações.
    * @param {object} income - O objeto da receita selecionada.
@@ -73,6 +77,15 @@ export default function ReceitaScreen({ navigation }) {
     setIsActionModalVisible(true); // Abre o modal de ações
   };
 
+  /**
+   * Fecha o modal de ações e limpa a seleção
+   */
+  const handleCloseModal = () => {
+    setIsActionModalVisible(false);
+    setSelectedIncome(null);
+  };
+
+  // Handlers de Manipulação de Dados
   /**
    * Lida com a exclusão de uma receita. Implementa "exclusão suave" (soft delete).
    * A receita é marcada como 'inactive' e uma data de exclusão é registrada,
@@ -208,18 +221,12 @@ export default function ReceitaScreen({ navigation }) {
         animationType="slide"
         transparent={true}
         visible={isActionModalVisible}
-        onRequestClose={() => {
-          setIsActionModalVisible(!isActionModalVisible);
-          setSelectedIncome(null); // Limpa a seleção ao fechar
-        }}
+        onRequestClose={handleCloseModal}
       >
         {/* Área que pode ser tocada fora do modal para fechá-lo */}
         <Pressable
           style={commonStyles.centeredView}
-          onPressOut={() => {
-            setIsActionModalVisible(false);
-            setSelectedIncome(null);
-          }}
+          onPressOut={handleCloseModal}
         >
           {/* Conteúdo do modal */}
           <View style={commonStyles.modalView}>
@@ -260,18 +267,19 @@ export default function ReceitaScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  // Combina o container base dos estilos comuns com padding horizontal específico para esta tela
+  // Estilos do container e lista
   container: {
     ...commonStyles.container,
   },
-  // Sobrescreve o título para marginBottom específico desta tela se necessário
   title: {
     ...commonStyles.title,
-    marginBottom: 20, // Título da lista tem menos espaço que os formulários
+    marginBottom: 20,
   },
   listContent: {
     ...commonStyles.listContent,
   },
+
+  // Estilos do card de receita
   incomeItem: {
     backgroundColor: '#ffffff',
     borderRadius: 8,
@@ -289,15 +297,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+
+  // Estilos de texto
   incomeName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
-  },
-  incomeDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   incomeType: {
     fontSize: 14,
@@ -311,18 +317,25 @@ const styles = StyleSheet.create({
   incomeValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#28a745', // Verde para receitas
+    color: '#28a745',
     textAlign: 'right',
     marginLeft: 15,
   },
-  // Estilo específico para o botão de adição flutuante (posição absoluta)
+
+  // Estilos de layout
+  incomeDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  // Estilos do botão flutuante
   addButton: {
-    ...commonStyles.addButton, // Reutiliza o estilo base do botão
+    ...commonStyles.addButton,
     position: 'absolute',
     bottom: 20,
     right: 20,
     width: 60,
     height: 60,
-    borderRadius: 30, // Transforma em círculo
+    borderRadius: 30,
   },
 });
