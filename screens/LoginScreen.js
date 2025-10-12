@@ -17,83 +17,116 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar 
 import commonStyles from '../utils/commonStyles';
 
 export default function LoginScreen({ navigation }) {
-  // Obtém os insets da área segura do dispositivo (ex: altura da barra de status no iOS, notch)
+  // Obtém os insets da área segura do dispositivo
   const insets = useSafeAreaInsets(); 
 
+  // Handlers
   /**
-   * Função que lida com a ação de "Entrar".
-   * Nesta versão simplificada, ela apenas navega para a tela "Home".
-   * Futuramente, aqui poderia ser implementada uma lógica de autenticação
-   * como biometria, PIN do celular, ou um sistema de login mais robusto.
+   * Navega para a tela Home
+   * Futuramente pode incluir autenticação com Firebase, biometria, etc.
    */
-  const fazerLogin = () => {
-    // Navega para a rota 'Home', que contém o navegador de abas principal
+  const handleLogin = () => {
     navigation.navigate('Home');
+  };
+
+  /**
+   * Função para desenvolvimento/testes
+   * @todo Implementar funcionalidades de desenvolvedor
+   */
+  const handleDevMode = () => {
+    console.log('Botão Dev pressionado');
+    alert('Funcionalidade de desenvolvedor ainda não implementada.');
   };
 
   return (
     // O container principal da tela, com padding superior ajustado
     // para evitar que o conteúdo fique atrás da barra de status do sistema.
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Título do aplicativo */}
-      <Text style={styles.titleText}>💰 Finanças Simples</Text>
+      {/* Seção de Cabeçalho */}
+      <View style={styles.headerSection}>
+        <Text style={styles.titleText}>💰 Finanças Simples</Text>
+      </View>
       
-      {/* Botão "Entrar" */}
-      <TouchableOpacity style={styles.loginButton} onPress={fazerLogin}>
-        <Text style={styles.loginButtonText}>Entrar</Text>
-      </TouchableOpacity>
-
-      {/* Botão Dev */}
-      <TouchableOpacity 
-        style={[styles.devButton, { marginTop: 100, backgroundColor: '#888' }]} 
-        onPress={() => {
-          console.log('Botão Dev pressionado');
-          alert('Funcionalidade de desenvolvedor ainda não implementada.')
-        }}>
-        <Text style={styles.loginButtonText}>Dev</Text>
+      {/* Seção de Botões */}
+      <View style={styles.buttonSection}>
+        <TouchableOpacity 
+          style={styles.loginButton} 
+          onPress={handleLogin}>
+          <Text style={styles.buttonText}>Entrar</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.devButton} 
+          onPress={handleDevMode}>
+          <Text style={styles.buttonText}>Dev</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Estilos de Layout
   container: {
-    flex: 1, // Ocupa todo o espaço disponível na tela
-    backgroundColor: '#f5f5f5', // Cor de fundo suave
-    alignItems: 'center', // Centraliza os itens horizontalmente
-    justifyContent: 'center', // Centraliza os itens verticalmente
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  devButton: {
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: '#888',
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 50,
   },
+  buttonSection: {
+    alignItems: 'center',
+    width: '100%',
+  },
+
+  // Estilos de Texto
   titleText: {
     fontSize: 30,
     fontWeight: 'bold',
-    color: '#007bff',          // azul principal
+    color: '#007bff',
     textAlign: 'center',
-    marginBottom: 100,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)', // sombra suave
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
   },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+
+  // Estilos de Botões
   loginButton: {
-    backgroundColor: '#28a745', // Verde sucesso
+    backgroundColor: '#28a745',
     paddingVertical: 15,
     paddingHorizontal: 40,
-    borderRadius: 25, // mais arredondado
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '80%',
+    maxWidth: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+    marginBottom: 20,
   },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  devButton: {
+    backgroundColor: '#888',
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
 });
