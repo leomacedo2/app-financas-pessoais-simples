@@ -30,12 +30,15 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 
 
 export default function CartaoScreen({ navigation }) {
-  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+  const insets = useSafeAreaInsets();
 
-  const [loadingApp, setLoadingApp] = useState(true); // Controla o carregamento da lista
-  const [cards, setCards] = useState([]); // Estado para armazenar a lista de cartões
-  const [isActionModalVisible, setIsActionModalVisible] = useState(false); // Controla a visibilidade do modal de ações
-  const [selectedCard, setSelectedCard] = useState(null); // Armazena o cartão selecionado para ações
+  // Estados relacionados a dados
+  const [cards, setCards] = useState([]); // Lista de cartões
+  const [loadingApp, setLoadingApp] = useState(true); // Estado de carregamento
+  
+  // Estados relacionados ao modal
+  const [isActionModalVisible, setIsActionModalVisible] = useState(false);
+  const [selectedCard, setSelectedCard] = useState(null);
 
   /**
    * Função para carregar os cartões do AsyncStorage.
@@ -82,11 +85,18 @@ export default function CartaoScreen({ navigation }) {
    * Lida com o toque longo em um item do cartão, abrindo o modal de ações.
    * @param {object} card - O objeto do cartão selecionado.
    */
-  const handleLongPressCard = (card) => {
-    setSelectedCard(card); // Define o cartão selecionado
-    setIsActionModalVisible(true); // Abre o modal de ações
+  // Handlers do Modal
+  const handleCloseModal = () => {
+    setIsActionModalVisible(false);
+    setSelectedCard(null);
   };
 
+  const handleLongPressCard = (card) => {
+    setSelectedCard(card);
+    setIsActionModalVisible(true);
+  };
+
+  // Handlers de Manipulação de Dados
   /**
    * Lida com a exclusão de um cartão. Implementa "exclusão suave" (soft delete).
    * O cartão é marcado como 'inactive' e uma data de exclusão é registrada,
@@ -218,18 +228,12 @@ export default function CartaoScreen({ navigation }) {
         animationType="slide"
         transparent={true}
         visible={isActionModalVisible}
-        onRequestClose={() => {
-          setIsActionModalVisible(!isActionModalVisible);
-          setSelectedCard(null); // Limpa a seleção ao fechar
-        }}
+        onRequestClose={handleCloseModal}
       >
         {/* Área que pode ser tocada fora do modal para fechá-lo */}
         <Pressable
           style={commonStyles.centeredView}
-          onPressOut={() => {
-            setIsActionModalVisible(false);
-            setSelectedCard(null);
-          }}
+          onPressOut={handleCloseModal}
         >
           {/* Conteúdo do modal */}
           <View style={commonStyles.modalView}>
@@ -270,32 +274,38 @@ export default function CartaoScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  // Estilos de Layout
   container: {
-    ...commonStyles.container, // Herda o estilo base
-    paddingHorizontal: 20, // Padding lateral específico para a lista de cartões
+    ...commonStyles.container,
+    paddingHorizontal: 20,
   },
   listContent: {
-    paddingBottom: 80, // Espaço para o botão de adição flutuante na parte inferior
+    paddingBottom: 80,
   },
+
+  // Estilos do Card
   cardItem: {
     backgroundColor: '#ffffff',
     borderRadius: 8,
     padding: 15,
     marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    // Sombras
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardIcon: {
-    marginRight: 15,
   },
   cardDetails: {
     flex: 1,
   },
+  cardIcon: {
+    marginRight: 15,
+  },
+
+  // Estilos de Texto
   cardAlias: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -306,14 +316,15 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
   },
-  // Estilo para o botão de adição flutuante (circular)
+
+  // Estilos do Botão Flutuante
   addButton: {
-    ...commonStyles.addButton, // Reutiliza o estilo base do botão
+    ...commonStyles.addButton,
     position: 'absolute',
     bottom: 20,
     right: 20,
     width: 60,
     height: 60,
-    borderRadius: 30, // Transforma em círculo
+    borderRadius: 30,
   },
 });
