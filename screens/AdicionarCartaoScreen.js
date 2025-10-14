@@ -12,15 +12,19 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 
 
 export default function AdicionarCartaoScreen({ navigation, route }) {
-  const insets = useSafeAreaInsets(); // Obter os insets da área segura
+  const insets = useSafeAreaInsets();
 
+  // Estados do formulário
   const [cardAlias, setCardAlias] = useState('');
-  const [dueDayOfMonth, setDueDayOfMonth] = useState('1'); // Dia do vencimento, como string para o Picker
+  const [dueDayOfMonth, setDueDayOfMonth] = useState('1');
+  
+  // Estados de controle
   const [savingCard, setSavingCard] = useState(false);
-
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Estados de dados do cartão
   const [currentCardId, setCurrentCardId] = useState(null);
-  const [currentCardStatus, setCurrentCardStatus] = useState('active'); // Adiciona estado para status
+  const [currentCardStatus, setCurrentCardStatus] = useState('active');
 
   // useEffect para preencher o formulário se for uma edição
   useEffect(() => {
@@ -42,70 +46,78 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
     }
   }, [route.params?.cardToEdit]); // Roda sempre que os parâmetros de rota mudam
 
-  // Função para salvar ou atualizar o cartão
-  const handleSaveCard = async () => {
+  /**
+   * Valida os dados do formulário
+   * @returns {boolean} Verdadeiro se os dados são válidos
+   */
+  const validateFormData = () => {
     if (!cardAlias.trim()) {
       Alert.alert('Erro', 'Por favor, insira um apelido para o cartão.');
-      return;
+      return false;
     }
 
     const day = parseInt(dueDayOfMonth, 10);
     if (isNaN(day) || day < 1 || day > 31) {
       Alert.alert('Erro', 'Por favor, insira um dia de vencimento válido (entre 1 e 31).');
-      return;
+      return false;
     }
 
+    return true;
+  };
+
+  /**
+   * Prepara os dados do cartão para salvar
+   * @returns {Object} Dados do cartão formatados
+   */
+  const prepareCardData = () => {
+    const day = parseInt(dueDayOfMonth, 10);
+    return {
+      alias: cardAlias.trim(),
+      dueDayOfMonth: day,
+      status: currentCardStatus,
+      ...(isEditing && currentCardId ? {
+        id: currentCardId,
+        createdAt: route.params.cardToEdit.createdAt
+      } : {
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      })
+    };
+  };
+
+  /**
+   * Função para salvar ou atualizar o cartão
+   */
+  const handleSaveCard = async () => {
+    if (!validateFormData()) return;
     setSavingCard(true); // Ativa o indicador de carregamento
 
     try {
       const storedCardsJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.CARDS);
       let cards = storedCardsJson ? JSON.parse(storedCardsJson) : [];
+      
+      const cardData = prepareCardData();
 
-      // Dados básicos do cartão
-      let cardData = {
-        alias: cardAlias.trim(),
-        dueDayOfMonth: day,
-        status: currentCardStatus, // Mantém o status existente ou 'active'
-      };
-
-      if (isEditing && currentCardId) {
-        // Modo de edição: mantém o ID existente e a data de criação
-        cardData.id = currentCardId;
-        cardData.createdAt = route.params.cardToEdit.createdAt;
-
+      if (isEditing) {
         const index = cards.findIndex(c => c.id === currentCardId);
         if (index !== -1) {
-          cards[index] = cardData; // Atualiza o cartão no array
+          cards[index] = cardData;
         } else {
-          // Caso não encontre (improvável), adiciona como novo para evitar perda de dados
           console.warn("Cartão a ser editado não encontrado. Adicionando como novo.");
-          cards.push({ ...cardData, id: Date.now().toString(), createdAt: new Date().toISOString() });
+          cards.push(cardData);
         }
         Alert.alert('Sucesso', 'Cartão atualizado com sucesso!');
-        console.log("Cartão atualizado no AsyncStorage:", cardData);
       } else {
-        // Modo de adição: gera um novo ID e data de criação
-        cardData.id = Date.now().toString(); // ID único
-        cardData.createdAt = new Date().toISOString(); // Data de criação
-        cardData.status = 'active'; // Novo cartão é sempre ativo
-
-        cards.push(cardData); // Adiciona o novo cartão ao array
+        cards.push(cardData);
         Alert.alert('Sucesso', 'Cartão adicionado com sucesso!');
-        console.log("Novo cartão adicionado ao AsyncStorage:", cardData);
       }
 
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.CARDS, JSON.stringify(cards));
-
-      // Limpa o formulário e volta para a tela anterior
-      setCardAlias('');
-      setDueDayOfMonth('1');
-      setIsEditing(false);
-      setCurrentCardId(null);
-      setCurrentCardStatus('active');
-
-      setTimeout(() => {
-        navigation.goBack(); // Volta para a tela de lista de cartões
-      }, 100);
+      console.log(`Cartão ${isEditing ? 'atualizado' : 'adicionado'} no AsyncStorage:`, cardData);
+      
+      // Limpa o formulário e navega de volta
+      resetForm();
+      navigation.goBack();
 
     } catch (error) {
       console.error("AdicionarCartaoScreen: Erro ao salvar cartão no AsyncStorage:", error);
@@ -113,6 +125,17 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
     } finally {
       setSavingCard(false); // Desativa o indicador de carregamento
     }
+  };
+
+  /**
+   * Reseta o formulário para o estado inicial
+   */
+  const resetForm = () => {
+    setCardAlias('');
+    setDueDayOfMonth('1');
+    setIsEditing(false);
+    setCurrentCardId(null);
+    setCurrentCardStatus('active');
   };
 
   return (
@@ -168,11 +191,13 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  // Estilos de Layout
   container: {
     ...commonStyles.container,
+    backgroundColor: '#f5f5f5',
   },
   scrollContent: {
     ...commonStyles.scrollContent,
+    paddingHorizontal: 20,
   },
-  // Outros estilos específicos desta tela podem ser adicionados aqui se necessário
 });
