@@ -159,18 +159,25 @@ export default function AdicionarCartaoScreen({ navigation, route }) {
         </View>
 
         {/* Seletor para o dia de vencimento da fatura */}
-        <View style={commonStyles.pickerContainer}>
-          <Text style={commonStyles.pickerLabel}>Dia do Vencimento da Fatura:</Text>
-          <Picker
-            selectedValue={dueDayOfMonth}
-            onValueChange={(itemValue) => setDueDayOfMonth(itemValue)}
-            style={commonStyles.picker}
-          >
-            {/* Gera opções de 1 a 31 para o dia do vencimento */}
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-              <Picker.Item key={String(day)} label={String(day)} value={String(day)} />
-            ))}
-          </Picker>
+        <View style={commonStyles.inputContainer}>
+          <Text style={commonStyles.label}>Dia do Vencimento da Fatura:</Text>
+          <View style={[commonStyles.input, styles.pickerWrapper]}>
+            <Picker
+              selectedValue={dueDayOfMonth}
+              onValueChange={(itemValue) => setDueDayOfMonth(itemValue)}
+              style={styles.picker}
+            >
+              {/* Gera opções de 1 a 31 para o dia do vencimento */}
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                <Picker.Item 
+                  key={String(day)} 
+                  label={String(day)} 
+                  value={String(day)}
+                  style={styles.pickerItem}
+                />
+              ))}
+            </Picker>
+          </View>
         </View>
 
         {/* Botão para Salvar/Adicionar Cartão */}
@@ -199,5 +206,21 @@ const styles = StyleSheet.create({
   scrollContent: {
     ...commonStyles.scrollContent,
     paddingHorizontal: 20,
+  },
+
+  // Estilos do Picker
+  pickerWrapper: {
+    paddingHorizontal: 0, // Remove o padding horizontal do input
+    height: 50, // Altura fixa para combinar com o TextInput
+    justifyContent: 'center',
+  },
+  picker: {
+    margin: 0,
+    height: 50,
+    width: '100%',
+  },
+  pickerItem: {
+    fontSize: 16,
+    height: 50,
   },
 });
