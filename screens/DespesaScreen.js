@@ -752,18 +752,29 @@ export default function DespesaScreen({ navigation, route }) {
             {cards.length > 0 ? (
               // Se há cartões cadastrados, exibe o seletor de cartão e o input de parcelas
               <>
-                <View style={commonStyles.pickerContainer}>
-                  <Text style={commonStyles.pickerLabel}>Selecione o Cartão:</Text>
-                  <Picker
-                    selectedValue={selectedCardId}
-                    onValueChange={(itemValue) => setSelectedCardId(itemValue)}
-                    style={commonStyles.picker}
-                  >
-                    <Picker.Item label="Selecione um Cartão" value="" />
-                    {cards.map(card => (
-                      <Picker.Item key={card.id} label={String(card.alias || '')} value={card.id} />
-                    ))}
-                  </Picker>
+                <View style={commonStyles.inputContainer}>
+                  <Text style={commonStyles.label}>Selecione o Cartão:</Text>
+                  <View style={[commonStyles.input, styles.pickerWrapper]}>
+                    <Picker
+                      selectedValue={selectedCardId}
+                      onValueChange={(itemValue) => setSelectedCardId(itemValue)}
+                      style={styles.picker}
+                    >
+                      <Picker.Item 
+                        label="Selecione um Cartão" 
+                        value=""
+                        style={styles.pickerItem}
+                      />
+                      {cards.map(card => (
+                        <Picker.Item 
+                          key={card.id} 
+                          label={String(card.alias || '')} 
+                          value={card.id}
+                          style={styles.pickerItem}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
                 </View>
 
                 <View style={styles.installmentInputContainer}>
@@ -878,6 +889,21 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     ...commonStyles.scrollContent,
+  },
+  // Estilos do Picker
+  pickerWrapper: {
+    paddingHorizontal: 0,
+    height: 50,
+    justifyContent: 'center',
+  },
+  picker: {
+    margin: 0,
+    height: 50,
+    width: '100%',
+  },
+  pickerItem: {
+    fontSize: 16,
+    height: 50,
   },
   creditOptionsContainer: {
     marginBottom: 15,
