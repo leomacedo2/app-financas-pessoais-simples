@@ -760,11 +760,6 @@ export default function DespesaScreen({ navigation, route }) {
                       onValueChange={(itemValue) => setSelectedCardId(itemValue)}
                       style={styles.picker}
                     >
-                      <Picker.Item 
-                        label="Selecione um Cartão" 
-                        value=""
-                        style={styles.pickerItem}
-                      />
                       {cards.map(card => (
                         <Picker.Item 
                           key={card.id} 
