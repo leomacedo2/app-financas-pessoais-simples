@@ -751,8 +751,9 @@ export default function DespesaScreen({ navigation, route }) {
           <View style={styles.creditOptionsContainer}>
             {cards.length > 0 ? (
               // Se há cartões cadastrados, exibe o seletor de cartão e o input de parcelas
-              <>
-                <View style={commonStyles.inputContainer}>
+              <View style={styles.creditFieldsRow}>
+                {/* Campo de Seleção do Cartão */}
+                <View style={[styles.creditFieldColumn, { flex: 2 }]}>
                   <Text style={commonStyles.label}>Selecione o Cartão:</Text>
                   <View style={[commonStyles.input, styles.pickerWrapper]}>
                     <Picker
@@ -772,18 +773,19 @@ export default function DespesaScreen({ navigation, route }) {
                   </View>
                 </View>
 
-                <View style={styles.installmentInputContainer}>
-                  <Text style={commonStyles.pickerLabel}>Número de Parcelas:</Text>
+                {/* Campo de Número de Parcelas */}
+                <View style={[styles.creditFieldColumn, { flex: 1 }]}>
+                  <Text style={commonStyles.label}>Parcelas:</Text>
                   <TextInput
-                    style={commonStyles.input}
-                    placeholder="Ex: 1, 3, 12"
+                    style={[commonStyles.input, { textAlign: 'center' }]}
+                    placeholder="1-12"
                     keyboardType="numeric"
                     value={numInstallments}
                     onChangeText={(text) => setNumInstallments(text.replace(/[^0-9]/g, ''))}
                     editable={isInstallmentsEditable}
                   />
                 </View>
-              </>
+              </View>
             ) : (
               // Mensagem se não houver cartões cadastrados
               <View style={styles.noCardsMessageContainer}>
@@ -903,8 +905,16 @@ const styles = StyleSheet.create({
   creditOptionsContainer: {
     marginBottom: 15,
   },
-  installmentInputContainer: {
+  // Estilos para layout em linha dos campos de crédito
+  creditFieldsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 15,
+    gap: 10, // Espaço entre os campos
+  },
+  creditFieldColumn: {
+    flexDirection: 'column',
   },
   fixedExpenseDayContainer: {
     marginBottom: 15,
