@@ -122,6 +122,8 @@ export default function DespesaScreen({ navigation, route }) {
   
   const [showDeleteModal, setShowDeleteModal] = useState(false); // Estado para o modal de confirmação de exclusão
   const [isInstallmentsEditable, setIsInstallmentsEditable] = useState(true); // Controla se o campo de parcelas pode ser editado
+  const [showInstallmentsModal, setShowInstallmentsModal] = useState(false); // Estado para o modal de parcelas personalizado
+  const [customInstallments, setCustomInstallments] = useState(''); // Estado para armazenar o valor personalizado de parcelas
 
   /**
    * Carrega os cartões ativos do AsyncStorage para exibição no Picker.
@@ -776,14 +778,25 @@ export default function DespesaScreen({ navigation, route }) {
                 {/* Campo de Número de Parcelas */}
                 <View style={[styles.creditFieldColumn, { flex: 1 }]}>
                   <Text style={commonStyles.label}>Parcelas:</Text>
-                  <TextInput
-                    style={[commonStyles.input, { textAlign: 'center' }]}
-                    placeholder="1-12"
-                    keyboardType="numeric"
-                    value={numInstallments}
-                    onChangeText={(text) => setNumInstallments(text.replace(/[^0-9]/g, ''))}
-                    editable={isInstallmentsEditable}
-                  />
+                  <View style={[commonStyles.input, styles.pickerWrapper]}>
+                    <Picker
+                      selectedValue={numInstallments}
+                      onValueChange={(itemValue) => {
+                        if (itemValue === 'outro') {
+                          setShowInstallmentsModal(true);
+                        } else {
+                          setNumInstallments(itemValue);
+                        }
+                      }}
+                      style={styles.picker}
+                      enabled={isInstallmentsEditable}
+                    >
+                      {[...Array(12)].map((_, i) => (
+                        <Picker.Item key={i + 1} label={String(i + 1)} value={String(i + 1)} />
+                      ))}
+                      <Picker.Item key="outro" label="Outro valor..." value="outro" />
+                    </Picker>
+                  </View>
                 </View>
               </View>
             ) : (
@@ -868,6 +881,64 @@ export default function DespesaScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[commonStyles.modalButton, commonStyles.buttonClose]}
                 onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Modal para inserção de número personalizado de parcelas */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showInstallmentsModal}
+        onRequestClose={() => {
+          setShowInstallmentsModal(false);
+          setNumInstallments('1');
+        }}
+      >
+        <Pressable 
+          style={commonStyles.centeredView} 
+          onPressOut={() => {
+            setShowInstallmentsModal(false);
+            setNumInstallments('1');
+          }}
+        >
+          <Pressable style={commonStyles.modalView} onPress={(e) => e.stopPropagation()}>
+            <Text style={commonStyles.modalTitle}>Número de Parcelas</Text>
+            <TextInput
+              style={[commonStyles.input, styles.installmentsInput]}
+              placeholder="Digite o número de parcelas"
+              keyboardType="numeric"
+              value={customInstallments}
+              onChangeText={setCustomInstallments}
+              autoFocus={true}
+            />
+            <View style={commonStyles.modalActionButtonsContainer}>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonSuccess]}
+                onPress={() => {
+                  const parsedNumber = parseInt(customInstallments, 10);
+                  if (!isNaN(parsedNumber) && parsedNumber > 0) {
+                    setNumInstallments(String(parsedNumber));
+                    setCustomInstallments('');
+                    setShowInstallmentsModal(false);
+                  } else {
+                    Alert.alert('Erro', 'Por favor, digite um número válido de parcelas.');
+                  }
+                }}
+              >
+                <Text style={commonStyles.buttonTextStyle}>Confirmar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[commonStyles.modalButton, commonStyles.buttonClose]}
+                onPress={() => {
+                  setShowInstallmentsModal(false);
+                  setCustomInstallments('');
+                  setNumInstallments('1');
+                }}
               >
                 <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
               </TouchableOpacity>
@@ -988,5 +1059,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
+  },
+  installmentsInput: {
+    textAlign: 'center',
+    fontSize: 24,
+    marginVertical: 15,
+    width: '100%',
   },
 });
