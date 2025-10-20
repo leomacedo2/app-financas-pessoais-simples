@@ -907,18 +907,33 @@ export default function DespesaScreen({ navigation, route }) {
           }}
         >
           <Pressable style={commonStyles.modalView} onPress={(e) => e.stopPropagation()}>
-            <Text style={commonStyles.modalTitle}>Número de Parcelas</Text>
-            <TextInput
-              style={[commonStyles.input, styles.installmentsInput]}
-              placeholder="Digite o número de parcelas"
-              keyboardType="numeric"
-              value={customInstallments}
-              onChangeText={setCustomInstallments}
-              autoFocus={true}
-            />
-            <View style={commonStyles.modalActionButtonsContainer}>
+            <Text style={styles.installmentsModalTitle}>Número de Parcelas</Text>
+            <View style={styles.installmentsInputContainer}>
+              <TextInput
+                style={styles.installmentsInput}
+                placeholder="0"
+                placeholderTextColor="#bbb"
+                keyboardType="numeric"
+                value={customInstallments}
+                onChangeText={setCustomInstallments}
+                autoFocus={true}
+                maxLength={2}
+              />
+            </View>
+            <Text style={styles.installmentsModalSubtitle}>Digite o número de parcelas desejado</Text>
+            <View style={[commonStyles.modalActionButtonsContainer, styles.installmentsButtonsContainer]}>
               <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonSuccess]}
+                style={[styles.installmentsButton, styles.installmentsCancelButton]}
+                onPress={() => {
+                  setShowInstallmentsModal(false);
+                  setCustomInstallments('');
+                  setNumInstallments('1');
+                }}
+              >
+                <Text style={styles.installmentsCancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.installmentsButton, styles.installmentsConfirmButton]}
                 onPress={() => {
                   const parsedNumber = parseInt(customInstallments, 10);
                   if (!isNaN(parsedNumber) && parsedNumber > 0) {
@@ -930,17 +945,7 @@ export default function DespesaScreen({ navigation, route }) {
                   }
                 }}
               >
-                <Text style={commonStyles.buttonTextStyle}>Confirmar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[commonStyles.modalButton, commonStyles.buttonClose]}
-                onPress={() => {
-                  setShowInstallmentsModal(false);
-                  setCustomInstallments('');
-                  setNumInstallments('1');
-                }}
-              >
-                <Text style={commonStyles.buttonTextStyle}>Cancelar</Text>
+                <Text style={styles.installmentsConfirmButtonText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -1060,10 +1065,67 @@ const styles = StyleSheet.create({
     shadowRadius: 1.41,
     elevation: 2,
   },
-  installmentsInput: {
-    textAlign: 'center',
+  // Estilos do modal de parcelas
+  installmentsModalTitle: {
     fontSize: 24,
-    marginVertical: 15,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  installmentsModalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 10,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  installmentsInputContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
     width: '100%',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  installmentsInput: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    width: '100%',
+    padding: 10,
+  },
+  installmentsButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 10,
+  },
+  installmentsButton: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  installmentsCancelButton: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  installmentsConfirmButton: {
+    backgroundColor: '#007bff',
+  },
+  installmentsCancelButtonText: {
+    color: '#495057',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  installmentsConfirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

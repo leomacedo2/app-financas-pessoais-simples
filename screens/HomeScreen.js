@@ -97,8 +97,8 @@ const formatMonthYearForExclusion = (date) => {
 const generateMonthsToDisplay = () => {
   const today = new Date();
   const months = [];
-  const numPastMonths = 12;
-  const numFutureMonths = 12;
+  const numPastMonths = 12;    // Meses anteriores
+  const numFutureMonths = 12;  // Meses futuros
 
   // Adiciona meses anteriores
   for (let i = numPastMonths; i > 0; i--) {
