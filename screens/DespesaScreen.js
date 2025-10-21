@@ -578,40 +578,41 @@ export default function DespesaScreen({ navigation, route }) {
 
       console.log('Excluindo despesa:', currentExpense);
       
+      // Processa todas as despesas para marcar as corretas como excluídas
+      const now = new Date().toISOString();
       const updatedExpenses = expenses.map(exp => {
-        // Se for despesa de Crédito, marca todas as parcelas com o mesmo `originalExpenseId` como inativas
-        if (currentExpense.paymentMethod === 'Crédito' && 
-            (exp.id.startsWith(baseId + '-') || exp.originalExpenseId === baseId)) {
+        // Para despesas de Crédito, exclui todas as parcelas relacionadas
+        if (currentExpense.paymentMethod === 'Crédito' &&
+            (exp.originalExpenseId === baseId || // Parcelas da despesa
+             exp.id === baseId || // Despesa principal
+             exp.id.startsWith(baseId + '-'))) { // Parcelas pelo ID
+          console.log(`Excluindo parcela de crédito: ${exp.id}`);
           return {
             ...exp,
             status: 'inactive',
-            deletedAt: new Date().toISOString(),
-          };
-        } 
-        // Para despesas Fixas ou de Débito, marca apenas a despesa específica como inativa
-        else if (exp.id === currentExpenseId) {
-          console.log('Marcando despesa como inativa:', {
-            id: exp.id,
-            tipo: exp.paymentMethod,
-            descricao: exp.description
-          });
-          
-          if (exp.paymentMethod === 'Fixa') {
-            // Para despesas fixas, pode-se adicionar lógica futura para meses excluídos
-            return {
-              ...exp,
-              status: 'inactive',
-              deletedAt: new Date().toISOString(),
-              excludedMonths: exp.excludedMonths || []
-            };
-          }
-          
-          return {
-            ...exp,
-            status: 'inactive',
-            deletedAt: new Date().toISOString(),
+            deletedAt: now
           };
         }
+        // Para despesas Fixas, adiciona o mês atual à lista de meses excluídos
+        else if (exp.id === currentExpenseId && exp.paymentMethod === 'Fixa') {
+          console.log(`Excluindo despesa fixa: ${exp.id}`);
+          return {
+            ...exp,
+            status: 'inactive',
+            deletedAt: now,
+            excludedMonths: [...(exp.excludedMonths || []), new Date().toISOString().substring(0, 7)]
+          };
+        }
+        // Para despesas de Débito, exclui apenas a específica
+        else if (exp.id === currentExpenseId) {
+          console.log(`Excluindo despesa única: ${exp.id}`);
+          return {
+            ...exp,
+            status: 'inactive',
+            deletedAt: now
+          };
+        }
+        
         return exp; // Retorna despesas inalteradas
       });
 

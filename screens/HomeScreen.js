@@ -94,27 +94,150 @@ const formatMonthYearForExclusion = (date) => {
  * Esta lista é a base para a FlatList e a geração de despesas aleatórias.
  * @returns {Date[]} Um array de objetos Date, cada um representando o primeiro dia de um mês.
  */
-const generateMonthsToDisplay = () => {
+const generateMonthsToDisplay = async () => {
+  console.log('=== Iniciando generateMonthsToDisplay ===');
+  let storedExpenses = [];
+  try {
+    const expensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
+    if (expensesJson) {
+      const allExpenses = JSON.parse(expensesJson);
+      console.log('Todas as despesas encontradas:', allExpenses.length);
+      
+      // Filtra apenas despesas não deletadas e ativas
+      storedExpenses = allExpenses.filter(expense => {
+        const isDeleted = expense.deletedAt || expense.status === 'inactive';
+        if (isDeleted) {
+          console.log(`Ignorando despesa ${expense.id} pois está deletada ou inativa`);
+          return false;
+        }
+        return true;
+      });
+      
+      console.log('Despesas ativas:', storedExpenses.length);
+      
+      // Log detalhado de cada despesa ativa
+      storedExpenses.forEach(expense => {
+        console.log('Despesa ativa:', {
+          id: expense.id,
+          tipo: expense.paymentMethod,
+          valor: expense.value,
+          data: expense.purchaseDate || expense.dueDate
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao carregar despesas:', error);
+    return [new Date()];
+  }
+
   const today = new Date();
-  const months = [];
-  const numPastMonths = 12;    // Meses anteriores
-  const numFutureMonths = 12;  // Meses futuros
+  const monthsToShow = new Set(); // Usamos Set para garantir meses únicos
+  
+  // Primeiro passo: Encontrar a data mais antiga e mais futura entre todas as despesas ativas
+  let earliestDate = new Date(today);
+  let latestDate = new Date(today);
+  
+  // Como já filtramos as despesas inativas/deletadas anteriormente, 
+  // aqui só processamos as que estão em storedExpenses
+  storedExpenses.forEach(expense => {
+    if (expense.paymentMethod === 'Crédito' && expense.dueDate) {
+      const dueDate = new Date(expense.dueDate);
+      const purchaseDate = new Date(expense.purchaseDate);
+      if (purchaseDate < earliestDate) earliestDate = new Date(purchaseDate);
+      if (dueDate > latestDate) latestDate = new Date(dueDate);
+    } else if (expense.paymentMethod === 'Débito' && expense.purchaseDate) {
+      const purchaseDate = new Date(expense.purchaseDate);
+      if (purchaseDate < earliestDate) earliestDate = new Date(purchaseDate);
+      if (purchaseDate > latestDate) latestDate = new Date(purchaseDate);
+    }
+  });
+  
+  console.log('Data mais antiga encontrada:', earliestDate.toLocaleDateString());
+  console.log('Data mais futura encontrada:', latestDate.toLocaleDateString());
 
-  // Adiciona meses anteriores
-  for (let i = numPastMonths; i > 0; i--) {
-    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    months.push(date);
+  // Calcula o período máximo baseado na diferença entre a data mais futura e hoje
+  const monthsDiff = (latestDate.getFullYear() - today.getFullYear()) * 12 
+                  + (latestDate.getMonth() - today.getMonth());
+  let maxFutureMonths = Math.max(24, monthsDiff + 1); // No mínimo 24 meses
+  
+  console.log(`Período máximo calculado: ${maxFutureMonths} meses`);
+
+  console.log('Gerando meses para exibição...');
+  console.log('Total de despesas encontradas:', storedExpenses.length);
+
+  // Primeiro, vamos processar as despesas de crédito para determinar o período máximo
+  console.log('=== Processando despesas de crédito ===');
+  storedExpenses.forEach(expense => {
+    if (expense.paymentMethod === 'Crédito' && expense.dueDate) {
+      const dueDate = new Date(expense.dueDate);
+      const purchaseDate = new Date(expense.purchaseDate);
+      let currentDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), 1);
+
+      while (currentDate <= dueDate) {
+        monthsToShow.add(currentDate.toISOString());
+        console.log(`Adicionando mês ${currentDate.toLocaleDateString()} para parcela de crédito`);
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      }
+    }
+  });
+
+  // Depois processamos as despesas fixas
+  console.log('=== Processando despesas fixas ===');
+  
+  // Limita o período máximo a 99 meses (máximo de parcelas permitido)
+  const absoluteMaxMonths = 99;
+  const effectiveMaxMonths = Math.min(maxFutureMonths, absoluteMaxMonths);
+  console.log(`Período efetivo para despesas fixas: ${effectiveMaxMonths} meses`);
+  
+  // Para despesas fixas, vamos considerar desde a data mais antiga até a mais futura
+  storedExpenses.forEach(expense => {
+    if (expense.paymentMethod === 'Fixa') {
+      // Começa da data mais antiga encontrada
+      let currentDate = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+      let endDate = new Date(today.getFullYear(), today.getMonth() + effectiveMaxMonths, 1);
+      
+      while (currentDate <= endDate) {
+        monthsToShow.add(currentDate.toISOString());
+        console.log(`Adicionando mês ${currentDate.toLocaleDateString()} para despesa fixa`);
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      }
+    }
+  });
+
+  // Por fim, processamos as despesas de débito
+  console.log('=== Processando despesas de débito ===');
+  storedExpenses.forEach(expense => {
+    if (expense.paymentMethod === 'Débito' && expense.purchaseDate) {
+      const purchaseDate = new Date(expense.purchaseDate);
+      const monthDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), 1);
+      monthsToShow.add(monthDate.toISOString());
+      console.log(`Adicionando mês ${monthDate.toLocaleDateString()} para despesa de débito`);
+    }
+  });
+
+  // Sempre garante que o mês atual está incluído
+  const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  monthsToShow.add(currentMonth.toISOString());
+  console.log(`Adicionando mês atual: ${currentMonth.toLocaleDateString()}`);
+
+  // Converte todas as datas ISO para objetos Date e ordena
+  const sortedMonths = Array.from(monthsToShow)
+    .map(dateStr => new Date(dateStr))
+    .sort((a, b) => a - b);
+
+  console.log('=== Resumo ===');
+  console.log(`Total de meses a exibir: ${sortedMonths.length}`);
+  console.log('Meses que serão exibidos:', sortedMonths.map(date => {
+    return `${date.getMonth() + 1}/${date.getFullYear()}`;
+  }).join(', '));
+
+  // Se não houver nenhum mês com despesas, retorna pelo menos o mês atual
+  if (sortedMonths.length === 0) {
+    console.log('Nenhum mês encontrado, retornando mês atual');
+    return [new Date(today.getFullYear(), today.getMonth(), 1)];
   }
 
-  // Adiciona o mês atual
-  months.push(new Date(today.getFullYear(), today.getMonth(), 1));
-
-  // Adiciona meses futuros
-  for (let i = 1; i <= numFutureMonths; i++) {
-    const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-    months.push(date);
-  }
-  return months;
+  return sortedMonths;
 };
 
 /**
@@ -228,12 +351,52 @@ export default function HomeScreen({ navigation }) {
   const [pickerMonth, setPickerMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [pickerYear, setPickerYear] = useState(String(new Date().getFullYear()));
 
-  // Referência para a lista completa de meses que podem ser exibidos
-  const monthsToDisplay = useRef(generateMonthsToDisplay());
-
-  // Objeto Date para representar o primeiro dia do mês atual do sistema
+  // Estado para armazenar a lista de meses (inicializado com o mês atual)
   const today = new Date();
   const initialMonthDate = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), []);
+  const [monthsToDisplay, setMonthsToDisplay] = useState([initialMonthDate]);
+
+  // useEffect para o carregamento inicial e atualizações
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoadingApp(true);
+        console.log('=== Carregando dados iniciais e atualizando meses ===');
+        
+        // Carrega as despesas
+        const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
+        const currentExpenses = storedExpensesJson ? JSON.parse(storedExpensesJson) : [];
+        setAllExpenses(currentExpenses);
+        
+        // Carrega as receitas
+        const storedIncomesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.INCOMES);
+        const currentIncomes = storedIncomesJson ? JSON.parse(storedIncomesJson) : [];
+        setAllIncomes(currentIncomes);
+        
+        // Gera os meses com base nas despesas carregadas
+        const months = await generateMonthsToDisplay();
+        setMonthsToDisplay(months);
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      } finally {
+        setLoadingApp(false);
+      }
+    };
+    
+    loadData();
+  }, []); // Executa apenas na montagem inicial do componente
+
+  // useEffect para atualizar os meses quando houver mudanças nas despesas ou receitas
+  useEffect(() => {
+    const updateMonths = async () => {
+      if (!loadingApp) { // Evita executar durante o carregamento inicial
+        console.log('=== Atualizando meses devido a mudanças em despesas/receitas ===');
+        const months = await generateMonthsToDisplay();
+        setMonthsToDisplay(months);
+      }
+    };
+    updateMonths();
+  }, [allExpenses, allIncomes, loadingApp]);
 
   // Estado para o índice do mês atualmente visível na FlatList
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
@@ -270,13 +433,9 @@ export default function HomeScreen({ navigation }) {
     let expensesForThisMonth = [];
 
     expensesData.forEach(item => {
-      // Ignora itens marcados para exclusão suave
-      if (item.deletedAt) {
-        return;
-      }
-
-      // Se `onlyActive` é true, ignora itens com status 'inactive'
-      if (onlyActive && item.status === 'inactive') {
+      // Primeiro verifica se o item está deletado ou inativo
+      if (item.deletedAt || (onlyActive && item.status === 'inactive')) {
+        console.log(`Ignorando despesa ${item.id} pois está deletada ou inativa`);
         return;
       }
 
@@ -411,11 +570,14 @@ export default function HomeScreen({ navigation }) {
    * Recomputa apenas quando `monthsToDisplay`, `initialMonthDate`, `allExpenses` ou `allIncomes` mudam.
    */
   const filteredMonthsToDisplay = useMemo(() => {
-    const allGeneratedMonths = monthsToDisplay.current;
+    // Use o estado monthsToDisplay diretamente
+    if (!monthsToDisplay || monthsToDisplay.length === 0) {
+      return [initialMonthDate];
+    }
     const todayMonth = initialMonthDate.getMonth();
     const todayYear = initialMonthDate.getFullYear();
 
-    const filtered = allGeneratedMonths.filter(monthDate => {
+    const filtered = monthsToDisplay.filter(monthDate => {
       const isCurrentSystemMonth = monthDate.getMonth() === todayMonth && monthDate.getFullYear() === todayYear;
       
       const activeExpensesForMonth = getExpensesForMonth(monthDate, allExpenses, true);
@@ -481,16 +643,14 @@ export default function HomeScreen({ navigation }) {
 
       // --- Lógica para determinar o `initialScrollIndex` ---
       // Recria a lista de meses filtrados temporariamente para encontrar o índice correto
-      const tempFilteredMonths = monthsToDisplay.current.filter(monthDate => {
-        const isCurrentSystemMonth = monthDate.getMonth() === initialMonthDate.getMonth() && monthDate.getFullYear() === initialMonthDate.getFullYear();
+      const tempFilteredMonths = monthsToDisplay.filter(monthDate => {
         const activeExpensesForMonth = getExpensesForMonth(monthDate, currentExpenses, true);
         const hasActiveExpenses = activeExpensesForMonth.length > 0;
-        const activeIncomesForMonth = getIncomesForMonth(monthDate, storedIncomes, true);
-        const hasActiveIncomes = activeIncomesForMonth.length > 0;
-        return isCurrentSystemMonth || hasActiveExpenses || hasActiveIncomes;
+        return hasActiveExpenses;
       });
-      // Garante que o mês atual esteja na lista, mesmo que não tenha movimentos
-      if (!tempFilteredMonths.some(m => m.getTime() === initialMonthDate.getTime())) {
+      
+      // Se não houver nenhum mês com despesas ativas, mostra apenas o mês atual
+      if (tempFilteredMonths.length === 0) {
         tempFilteredMonths.push(initialMonthDate);
       }
       tempFilteredMonths.sort((a, b) => a.getTime() - b.getTime()); // Re-ordena
@@ -516,7 +676,7 @@ export default function HomeScreen({ navigation }) {
       setLoadingApp(false); // Finaliza o indicador de carregamento
       scrollAttempted.current = false; // Reseta a flag de rolagem para permitir um novo scroll
     }
-  }, [initialMonthDate, monthsToDisplay, getExpensesForMonth, getIncomesForMonth]); // Depende dessas funções/variáveis
+  }, [initialMonthDate, getExpensesForMonth, getIncomesForMonth]); // Depende dessas funções/variáveis
 
   /**
    * Função para gerar despesas aleatórias para fins de teste e demonstração.
@@ -527,7 +687,7 @@ export default function HomeScreen({ navigation }) {
     setLoadingApp(true);
     try {
       console.log("[DEBUG] Iniciando geração de despesas aleatórias");
-      const generated = generateRandomExpensesData(monthsToDisplay.current);
+      const generated = generateRandomExpensesData(monthsToDisplay);
       console.log("[DEBUG] Despesas geradas:", generated);
 
       const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
@@ -551,7 +711,7 @@ export default function HomeScreen({ navigation }) {
     } finally {
       setLoadingApp(false);
     }
-  }, [loadData, monthsToDisplay]); // Depende de `loadData` e `monthsToDisplay`
+  }, [loadData]); // Depende apenas de loadData
 
   /**
    * `useFocusEffect` para garantir que os dados sejam recarregados e a tela seja atualizada
