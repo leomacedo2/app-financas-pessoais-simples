@@ -158,7 +158,7 @@ const generateMonthsToDisplay = async () => {
   // Calcula o período máximo baseado na diferença entre a data mais futura e hoje
   const monthsDiff = (latestDate.getFullYear() - today.getFullYear()) * 12 
                   + (latestDate.getMonth() - today.getMonth());
-  let maxFutureMonths = Math.max(24, monthsDiff + 1); // No mínimo 24 meses
+  let maxFutureMonths = Math.max(12, monthsDiff + 1); // No mínimo 24 meses
   
   console.log(`Período máximo calculado: ${maxFutureMonths} meses`);
 
