@@ -17,6 +17,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'; // 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'; // Para navegação por abas na parte inferior
 import { Ionicons } from '@expo/vector-icons'; // Ícones para as abas
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'; // Para lidar com a área segura do dispositivo (notch, barra de status)
+import { AppProvider } from './AppContext'; // Importa o Provider do contexto global
 
 // Importa as telas do aplicativo
 import LoginScreen from './screens/LoginScreen';
@@ -152,16 +153,19 @@ function HomeTabs() {
  */
 export default function App() {
   return (
-    // SafeAreaProvider garante que useSafeAreaInsets funcione em todo o app
-    <SafeAreaProvider>
-      {/* NavigationContainer gerencia o estado da navegação */}
-      <NavigationContainer>
-        {/* Stack Navigator principal para alternar entre Login e as abas do Home */}
-        <Stack.Navigator initialRouteName="Login">
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Home" component={HomeTabs} options={{ headerShown: false }} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    // AppProvider fornece o contexto global para todo o aplicativo
+    <AppProvider>
+      {/* SafeAreaProvider garante que useSafeAreaInsets funcione em todo o app */}
+      <SafeAreaProvider>
+        {/* NavigationContainer gerencia o estado da navegação */}
+        <NavigationContainer>
+          {/* Stack Navigator principal para alternar entre Login e as abas do Home */}
+          <Stack.Navigator initialRouteName="Login">
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Home" component={HomeTabs} options={{ headerShown: false }} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </AppProvider>
   );
 }

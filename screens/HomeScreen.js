@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useAppContext } from '../AppContext';
 import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -30,9 +31,6 @@ import { ASYNC_STORAGE_KEYS } from '../utils/constants';
 
 // Obtém a largura da tela do dispositivo para configurar a rolagem paginada do FlatList
 const { width } = Dimensions.get('window');
-
-// Constante criada para controlar a exibição dos botões de geração de dados de teste
-const mostrarBotoesTeste = false;
 
 /**
  * Converte uma string de data no formato "DD/MM/AAAA" para um objeto Date.
@@ -334,6 +332,7 @@ const generateRandomExpensesData = (monthsToConsider) => {
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets(); // Hook para obter os insets da área segura da tela
+  const { mostrarBotoesTeste } = useAppContext(); // Obtém o estado do modo de desenvolvedor do contexto
 
   // Estado para controlar o carregamento inicial da aplicação
   const [loadingApp, setLoadingApp] = useState(true);

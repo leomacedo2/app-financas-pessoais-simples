@@ -10,8 +10,9 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'; // Importa componentes básicos do React Native
-import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Importar useSafeAreaInsets para lidar com a barra de status
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppContext } from '../AppContext'; // Importa o hook do contexto
 
 // Importa os estilos comuns entre as telas
 import commonStyles from '../utils/commonStyles';
@@ -30,12 +31,14 @@ export default function LoginScreen({ navigation }) {
   };
 
   /**
-   * Função para desenvolvimento/testes
-   * @todo Implementar funcionalidades de desenvolvedor
+   * Função para alternar o modo de desenvolvimento
+   * Controla a exibição dos botões de teste na HomeScreen
    */
+  const { toggleMostrarBotoesTeste, mostrarBotoesTeste } = useAppContext();
+  
   const handleDevMode = () => {
-    console.log('Botão Dev pressionado');
-    alert('Funcionalidade de desenvolvedor ainda não implementada.');
+    toggleMostrarBotoesTeste();
+    console.log('Modo desenvolvedor:', !mostrarBotoesTeste ? 'ATIVADO' : 'DESATIVADO');
   };
 
   return (
