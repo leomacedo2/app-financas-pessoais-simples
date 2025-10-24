@@ -64,6 +64,16 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.buttonText}>Dev</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Indicador do modo desenvolvedor */}
+      <View style={styles.devModeIndicator}>
+        <Text style={[
+          styles.devModeText,
+          mostrarBotoesTeste ? styles.devModeActive : styles.devModeInactive
+        ]}>
+          Modo Dev: {mostrarBotoesTeste ? 'ON' : 'OFF'}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -131,5 +141,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
+  },
+  // Estilos para o indicador do modo desenvolvedor
+  devModeIndicator: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  devModeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  devModeActive: {
+    color: '#28a745', // Verde quando ativo
+  },
+  devModeInactive: {
+    color: '#dc3545', // Vermelho quando inativo
   },
 });
