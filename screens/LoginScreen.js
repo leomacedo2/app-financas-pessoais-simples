@@ -42,9 +42,14 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    // O container principal da tela, com padding superior ajustado
-    // para evitar que o conteúdo fique atrás da barra de status do sistema.
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    // O container principal da tela, com padding ajustado para a área segura
+    <View style={[
+      styles.container, 
+      { 
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom 
+      }
+    ]}>
       {/* Seção de Cabeçalho */}
       <View style={styles.headerSection}>
         <Text style={styles.titleText}>💰 Finanças Simples</Text>
@@ -145,7 +150,7 @@ const styles = StyleSheet.create({
   // Estilos para o indicador do modo desenvolvedor
   devModeIndicator: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 80, // Aumentei para ficar acima da área de navegação
     right: 20,
     padding: 8,
     borderRadius: 8,
