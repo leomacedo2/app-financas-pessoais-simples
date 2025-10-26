@@ -229,10 +229,15 @@ const generateMonthsToDisplay = async () => {
     return `${date.getMonth() + 1}/${date.getFullYear()}`;
   }).join(', '));
 
-  // Se não houver nenhum mês com despesas, retorna pelo menos o mês atual
+  // Se não houver nenhum mês com despesas, gera um período de 25 meses
   if (sortedMonths.length === 0) {
-    console.log('Nenhum mês encontrado, retornando mês atual');
-    return [new Date(today.getFullYear(), today.getMonth(), 1)];
+    console.log('Nenhum mês encontrado, gerando período padrão de meses');
+    const mesesPadrao = [];
+    // Gera 12 meses para trás e 12 para frente
+    for (let i = -12; i <= 12; i++) {
+      mesesPadrao.push(new Date(today.getFullYear(), today.getMonth() + i, 1));
+    }
+    return mesesPadrao.sort((a, b) => a - b);
   }
 
   return sortedMonths;
@@ -265,19 +270,13 @@ const generateRandomExpensesData = (monthsToConsider) => {
   
   console.log("[DEBUG] Meses disponíveis:", monthsToConsider.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
   
-  // Filtra apenas os meses atuais e futuros
-  const today = new Date();
-  const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  // Usa todos os meses disponíveis para geração de despesas
+  const mesesParaGerar = [...monthsToConsider].sort((a, b) => a.getTime() - b.getTime());
   
-  const futureMeses = monthsToConsider.filter(monthDate => {
-    const startOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-    return startOfMonth >= currentMonth;
-  }).sort((a, b) => a.getTime() - b.getTime());
-  
-  console.log("[DEBUG] Meses futuros:", futureMeses.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
+  console.log("[DEBUG] Meses para gerar despesas:", mesesParaGerar.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
   
   // Para cada mês disponível, gera algumas despesas
-  futureMeses.forEach((monthDate, monthIndex) => {
+  mesesParaGerar.forEach((monthDate, monthIndex) => {
     const year = monthDate.getFullYear();
     const month = monthDate.getMonth();
     
@@ -576,6 +575,16 @@ export default function HomeScreen({ navigation }) {
     const todayMonth = initialMonthDate.getMonth();
     const todayYear = initialMonthDate.getFullYear();
 
+    // Se não houver despesas ou receitas ativas, mostra todos os meses disponíveis
+    const hasAnyActiveExpenses = allExpenses.some(exp => !exp.deletedAt && exp.status !== 'inactive');
+    const hasAnyActiveIncomes = allIncomes.some(inc => !inc.deletedAt && inc.status !== 'inactive');
+
+    if (!hasAnyActiveExpenses && !hasAnyActiveIncomes) {
+      console.log('Nenhuma movimentação encontrada, mostrando todos os meses disponíveis');
+      return monthsToDisplay.sort((a, b) => a.getTime() - b.getTime());
+    }
+
+    // Se houver movimentações, filtra os meses que têm algo
     const filtered = monthsToDisplay.filter(monthDate => {
       const isCurrentSystemMonth = monthDate.getMonth() === todayMonth && monthDate.getFullYear() === todayYear;
       
@@ -585,11 +594,10 @@ export default function HomeScreen({ navigation }) {
       const activeIncomesForMonth = getIncomesForMonth(monthDate, allIncomes, true);
       const hasActiveIncomes = activeIncomesForMonth.length > 0;
 
-      // Retorna true se for o mês atual, ou se tiver despesas/receitas ativas
       return isCurrentSystemMonth || hasActiveExpenses || hasActiveIncomes;
     });
 
-    // Garante que o mês atual do sistema esteja sempre incluído, mesmo que não tenha movimentos
+    // Garante que o mês atual do sistema esteja sempre incluído
     const isTodayMonthIncluded = filtered.some(monthDate =>
       monthDate.getMonth() === todayMonth && monthDate.getFullYear() === todayYear
     );
@@ -685,8 +693,20 @@ export default function HomeScreen({ navigation }) {
   const handleGenerateRandomExpenses = useCallback(async () => {
     setLoadingApp(true);
     try {
+      // Primeiro, gera um período de meses para as despesas (24 meses: 12 passados e 12 futuros)
+      const today = new Date();
+      const mesesParaGerar = [];
+      
+      // Adiciona 12 meses para trás
+      for (let i = -12; i <= 12; i++) {
+        const data = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        mesesParaGerar.push(data);
+      }
+
       console.log("[DEBUG] Iniciando geração de despesas aleatórias");
-      const generated = generateRandomExpensesData(monthsToDisplay);
+      console.log("[DEBUG] Meses para gerar:", mesesParaGerar.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
+      
+      const generated = generateRandomExpensesData(mesesParaGerar);
       console.log("[DEBUG] Despesas geradas:", generated);
 
       const storedExpensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
@@ -699,11 +719,16 @@ export default function HomeScreen({ navigation }) {
       await AsyncStorage.setItem(ASYNC_STORAGE_KEYS.EXPENSES, JSON.stringify(combinedExpenses));
       console.log("[DEBUG] Despesas salvas no AsyncStorage");
 
-      setAllExpenses(combinedExpenses); // Atualiza o estado diretamente
+      // Primeiro atualiza as despesas no estado
+      setAllExpenses(combinedExpenses);
       console.log("[DEBUG] Estado de allExpenses atualizado");
 
+      // Força a atualização da lista de meses
+      const newMonths = await generateMonthsToDisplay();
+      setMonthsToDisplay(newMonths);
+      console.log("[DEBUG] Lista de meses atualizada:", newMonths.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
+
       Alert.alert('Sucesso', `${generated.length} despesas aleatórias geradas e adicionadas!`);
-      await loadData(); // Recarrega os dados para que as novas despesas sejam exibidas
     } catch (error) {
       console.error("HomeScreen: Erro ao gerar despesas aleatórias:", error);
       Alert.alert('Erro', `Não foi possível gerar despesas aleatórias: ${error.message}`);
