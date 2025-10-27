@@ -311,11 +311,12 @@ const generateRandomExpensesData = (monthsToConsider) => {
         id: Date.now().toString() + monthIndex + i, // ID único com índice do mês e da despesa
         description,
         value,
-        createdAt: createdAtDate.toISOString(),
+        createdAt: createdAtDate.toISOString(), // Timestamp de criação do registro
+        purchaseDate: createdAtDate.toISOString(), // Data da compra
+        dueDate: createdAtDate.toISOString(), // Para débito, a data de vencimento é igual à data de compra
         status: isPaidRandom ? 'paid' : 'pending',
         paidAt: isPaidRandom ? new Date().toISOString() : null,
         paymentMethod: 'Débito',
-        dueDate: createdAtDate.toISOString(),
         deletedAt: null
       };
 
