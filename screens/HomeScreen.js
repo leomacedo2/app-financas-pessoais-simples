@@ -694,12 +694,12 @@ export default function HomeScreen({ navigation }) {
   const handleGenerateRandomExpenses = useCallback(async () => {
     setLoadingApp(true);
     try {
-      // Primeiro, gera um período de meses para as despesas (24 meses: 12 passados e 12 futuros)
+      // Gera despesas apenas para o mês atual e 12 meses futuros
       const today = new Date();
       const mesesParaGerar = [];
       
-      // Adiciona 12 meses para trás
-      for (let i = -12; i <= 12; i++) {
+      // Adiciona mês atual e 12 meses para frente
+      for (let i = 0; i <= 12; i++) {
         const data = new Date(today.getFullYear(), today.getMonth() + i, 1);
         mesesParaGerar.push(data);
       }
