@@ -50,9 +50,11 @@ export default function LoginScreen({ navigation }) {
         paddingBottom: insets.bottom 
       }
     ]}>
-      {/* Seção de Cabeçalho */}
+      {/* Seção de Cabeçalho - Título clicável para modo dev */}
       <View style={styles.headerSection}>
-        <Text style={styles.titleText}>💰 Finanças Simples</Text>
+        <TouchableOpacity onPress={handleDevMode}>
+          <Text style={styles.titleText}>💰 Finanças Simples</Text>
+        </TouchableOpacity>
       </View>
       
       {/* Seção de Botões */}
@@ -61,12 +63,6 @@ export default function LoginScreen({ navigation }) {
           style={styles.loginButton} 
           onPress={handleLogin}>
           <Text style={styles.buttonText}>Entrar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.devButton} 
-          onPress={handleDevMode}>
-          <Text style={styles.buttonText}>Dev</Text>
         </TouchableOpacity>
       </View>
 
@@ -133,24 +129,10 @@ const styles = StyleSheet.create({
     elevation: 5,
     marginBottom: 20,
   },
-  devButton: {
-    backgroundColor: '#888',
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  // Estilos para o indicador do modo desenvolvedor
+  // Estilos para o indicador do modo desenvolvedor - mais discreto
   devModeIndicator: {
     position: 'absolute',
-    bottom: 80, // Aumentei para ficar acima da área de navegação
+    bottom: 50, // Aumentei para ficar acima da área de navegação
     right: 20,
     padding: 8,
     borderRadius: 8,
