@@ -35,10 +35,26 @@ export default function LoginScreen({ navigation }) {
    * Controla a exibição dos botões de teste na HomeScreen
    */
   const { toggleMostrarBotoesTeste, mostrarBotoesTeste } = useAppContext();
+  const [touchCount, setTouchCount] = React.useState(0);
   
   const handleDevMode = () => {
-    toggleMostrarBotoesTeste();
-    console.log('Modo desenvolvedor:', !mostrarBotoesTeste ? 'ATIVADO' : 'DESATIVADO');
+    if (mostrarBotoesTeste) {
+      // Se o modo dev está ativo, desativa com um toque
+      toggleMostrarBotoesTeste();
+      setTouchCount(0);
+      console.log('Modo desenvolvedor: DESATIVADO');
+    } else {
+      // Se o modo dev está inativo, incrementa o contador
+      const newCount = touchCount + 1;
+      setTouchCount(newCount);
+      
+      // Ativa apenas se atingir 5 toques
+      if (newCount >= 5) {
+        toggleMostrarBotoesTeste();
+        setTouchCount(0);
+        console.log('Modo desenvolvedor: ATIVADO');
+      }
+    }
   };
 
   return (
