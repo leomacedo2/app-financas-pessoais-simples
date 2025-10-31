@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppContext } from '../AppContext'; // Importa o hook do contexto
 
@@ -50,6 +50,11 @@ export default function LoginScreen({ navigation }) {
       
       // Ativa apenas se atingir 5 toques
       if (newCount >= 5) {
+        Alert.alert(
+          "Modo Desenvolvedor",
+          "Modo desenvolvedor ativado com sucesso!",
+          [{ text: "OK" }]
+        );
         toggleMostrarBotoesTeste();
         setTouchCount(0);
         console.log('Modo desenvolvedor: ATIVADO');
