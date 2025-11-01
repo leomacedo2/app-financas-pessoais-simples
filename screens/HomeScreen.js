@@ -340,6 +340,9 @@ export default function HomeScreen({ navigation }) {
   const [allIncomes, setAllIncomes] = useState([]);
   // Estado para armazenar todas as despesas carregadas
   const [allExpenses, setAllExpenses] = useState([]);
+  
+  // Estado para controlar a ordem das despesas por data
+  const [dateOrder, setDateOrder] = useState('desc');
 
   // Estados para controlar a visibilidade e seleção do modal de limpeza de dados
   const [isClearDataModalVisible, setIsClearDataModalVisible] = useState(false);
@@ -1141,9 +1144,26 @@ export default function HomeScreen({ navigation }) {
    * @param {object} param0 - Objeto contendo o item (monthDate) e o índice.
    * @returns {JSX.Element} Componente de visualização para o mês.
    */
+  // Função para ordenar as despesas por data
+  const sortExpensesByDate = useCallback((expenses) => {
+    return [...expenses].sort((a, b) => {
+      const dateA = new Date(a.purchaseDate);
+      const dateB = new Date(b.purchaseDate);
+      return dateOrder === 'asc' ? dateA - dateB : dateB - dateA;
+    });
+  }, [dateOrder]);
+
+  // Handler para alternar a ordem das datas
+  const handleToggleDataOrder = useCallback(() => {
+    console.log('Alterando ordem de:', dateOrder, 'para:', dateOrder === 'asc' ? 'desc' : 'asc');
+    setDateOrder(current => current === 'asc' ? 'desc' : 'asc');
+  }, [dateOrder]);
+
   const renderMonthSection = ({ item: monthDate, index }) => {
     // Filtra as despesas ativas para o mês atual da seção
-    const expenses = getExpensesForMonth(monthDate, allExpenses, true);
+    const monthExpenses = getExpensesForMonth(monthDate, allExpenses, true);
+    // Aplica a ordenação
+    const expenses = sortExpensesByDate(monthExpenses);
     const monthName = getMonthName(monthDate);
     const year = monthDate.getFullYear();
 
@@ -1162,6 +1182,30 @@ export default function HomeScreen({ navigation }) {
             <Text style={isSystemCurrentMonth ? styles.currentMonthTitle : styles.regularMonthTitle}>
               {String(monthName)} {String(year)}
             </Text>
+          </View>
+
+          {/* Barra de Filtros */}
+          <View style={styles.filtersBar}>
+            <TouchableOpacity style={styles.filterItem} onPress={handleToggleDataOrder}>
+              <Text style={styles.filterText}>Data</Text>
+              <Ionicons 
+                name={dateOrder === 'asc' ? 'arrow-up' : 'arrow-down'} 
+                size={16} 
+                color="#666" 
+              />
+            </TouchableOpacity>
+            
+            <View style={styles.filterDivider} />
+            
+            <View style={styles.filterItem}>
+              {/* Placeholder para filtro de status */}
+            </View>
+            
+            <View style={styles.filterDivider} />
+            
+            <View style={styles.filterItem}>
+              {/* Placeholder para filtro de valor */}
+            </View>
           </View>
 
           {/* Cabeçalho da tabela de despesas com colunas para checkbox, descrição e valor */}
@@ -1411,7 +1455,7 @@ export default function HomeScreen({ navigation }) {
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={handleScroll} // Acionado ao final da rolagem para atualizar o mês
         initialScrollIndex={currentMonthIndex} // Define o mês inicial na montagem
-        extraData={currentMonthIndex} // Força re-renderização quando o índice do mês visível muda
+        extraData={[currentMonthIndex, dateOrder]} // Força re-renderização quando o índice ou ordem mudam
         getItemLayout={(data, index) => ({ // Otimização para performance da FlatList
           length: width, // Cada item ocupa a largura total da tela
           offset: width * index,
@@ -1592,10 +1636,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 8,
+  },
+  // Container da barra de filtros
+  filtersBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    marginBottom: 15,
+    borderRadius: 8,
+  },
+  // Container para cada filtro individual
+  filterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 4,
+  },
+  // Texto do filtro
+  filterText: {
+    fontSize: 13,
+    color: '#666',
+    marginRight: 4,
+  },
+  // Separador vertical entre filtros
+  filterDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#dee2e6',
+    marginHorizontal: 8,
   },
   // Container especial para o mês atual (apenas muda a cor de fundo)
   currentMonthTitleContainer: {
