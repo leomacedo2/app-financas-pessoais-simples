@@ -341,8 +341,9 @@ export default function HomeScreen({ navigation }) {
   // Estado para armazenar todas as despesas carregadas
   const [allExpenses, setAllExpenses] = useState([]);
   
-  // Estado para controlar a ordem das despesas por data
-  const [dateOrder, setDateOrder] = useState('desc');
+  // Estados para controlar a ordenação das despesas
+  const [activeFilter, setActiveFilter] = useState('date'); // Começa ordenando por data
+  const [filterOrder, setFilterOrder] = useState('asc'); // Começa em ordem ascendente
 
   // Estados para controlar a visibilidade e seleção do modal de limpeza de dados
   const [isClearDataModalVisible, setIsClearDataModalVisible] = useState(false);
@@ -763,28 +764,39 @@ export default function HomeScreen({ navigation }) {
    * Garante que a `FlatList` inicie no mês correto, evitando o "flicker".
    */
   useEffect(() => {
-    // Só tenta rolar se o app não estiver carregando, houver meses para exibir e a rolagem ainda não foi tentada
-    if (!loadingApp && filteredMonthsToDisplay.length > 0 && !scrollAttempted.current) {
-        const targetIndex = filteredMonthsToDisplay.findIndex(monthDate =>
-            monthDate.getMonth() === initialMonthDate.getMonth() &&
-            monthDate.getFullYear() === initialMonthDate.getFullYear()
-        );
+    // Reseta a tentativa de rolagem quando a lista de meses muda
+    if (filteredMonthsToDisplay.length !== currentMonthIndex + 1) {
+      scrollAttempted.current = false;
+    }
 
-        if (flatListRef.current && targetIndex !== -1 && currentMonthIndex === targetIndex) {
-            // Se já está no mês alvo e o índice já está correto, marca como rolado
-            scrollAttempted.current = true;
-            console.log(`[DEBUG - Scroll useEffect]: Já no mês alvo: ${getMonthName(initialMonthDate)}/${initialMonthDate.getFullYear()} (Index: ${targetIndex})`);
-        } else if (flatListRef.current && targetIndex !== -1) {
-            // Se não está no mês alvo ou o índice precisa ser ajustado, realiza a rolagem
-            setTimeout(() => {
-                if (flatListRef.current) {
-                    flatListRef.current.scrollToIndex({ index: targetIndex, animated: false });
-                    setCurrentMonthIndex(targetIndex); // Atualiza o estado do índice
-                    scrollAttempted.current = true;
-                    console.log(`[DEBUG - Scroll useEffect]: Corrigindo rolagem para o mês alvo: ${getMonthName(initialMonthDate)}/${initialMonthDate.getFullYear()} (Index: ${targetIndex})`);
-                }
-            }, 100); // Pequeno atraso para garantir que a FlatList esteja renderizada
-        }
+    // Só tenta rolar se o app não estiver carregando e houver meses para exibir
+    if (!loadingApp && filteredMonthsToDisplay.length > 0) {
+      const targetIndex = Math.min(
+        currentMonthIndex,
+        filteredMonthsToDisplay.length - 1
+      );
+
+      // Se o índice atual está fora do range, ajusta para um valor válido
+      if (currentMonthIndex >= filteredMonthsToDisplay.length) {
+        setCurrentMonthIndex(targetIndex);
+      }
+
+      if (flatListRef.current && !scrollAttempted.current) {
+        setTimeout(() => {
+          if (flatListRef.current) {
+            try {
+              flatListRef.current.scrollToIndex({ 
+                index: targetIndex, 
+                animated: false 
+              });
+              scrollAttempted.current = true;
+              console.log(`[DEBUG - Scroll useEffect]: Ajustando para índice seguro: ${targetIndex}`);
+            } catch (error) {
+              console.log('[DEBUG - Scroll useEffect]: Erro ao rolar:', error);
+            }
+          }
+        }, 100);
+      }
     }
   }, [loadingApp, filteredMonthsToDisplay, initialMonthDate, currentMonthIndex]); // Depende desses estados/refs
 
@@ -1144,26 +1156,81 @@ export default function HomeScreen({ navigation }) {
    * @param {object} param0 - Objeto contendo o item (monthDate) e o índice.
    * @returns {JSX.Element} Componente de visualização para o mês.
    */
-  // Função para ordenar as despesas por data
-  const sortExpensesByDate = useCallback((expenses) => {
-    return [...expenses].sort((a, b) => {
-      const dateA = new Date(a.purchaseDate);
-      const dateB = new Date(b.purchaseDate);
-      return dateOrder === 'asc' ? dateA - dateB : dateB - dateA;
-    });
-  }, [dateOrder]);
+  // Função para ordenar as despesas por data ou valor
+  const sortExpenses = useCallback((expenses) => {
+    if (!activeFilter) return expenses; // Se não há filtro ativo, retorna a lista original
 
-  // Handler para alternar a ordem das datas
+    console.log('Ordenando despesas:', {
+      filtroAtivo: activeFilter,
+      ordem: filterOrder
+    });
+    
+    // Cria uma cópia do array para não modificar o original
+    return [...expenses].sort((a, b) => {
+      if (activeFilter === 'value') {
+        const valueA = parseFloat(a.value) || 0;
+        const valueB = parseFloat(b.value) || 0;
+        
+        console.log('Comparando valores:', { 
+          A: valueA, 
+          B: valueB,
+          ordem: filterOrder 
+        });
+        
+        return filterOrder === 'asc' ? valueA - valueB : valueB - valueA;
+      } else { // date
+        const dateA = new Date(a.purchaseDate);
+        const dateB = new Date(b.purchaseDate);
+        
+        console.log('Comparando datas:', { 
+          A: dateA.toISOString(), 
+          B: dateB.toISOString() 
+        });
+        
+        return filterOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+    });
+  }, [activeFilter, filterOrder]);
+
+  // Handlers para alternar as ordens
   const handleToggleDataOrder = useCallback(() => {
-    console.log('Alterando ordem de:', dateOrder, 'para:', dateOrder === 'asc' ? 'desc' : 'asc');
-    setDateOrder(current => current === 'asc' ? 'desc' : 'asc');
-  }, [dateOrder]);
+    if (activeFilter === 'date') {
+      // Se já está ordenando por data, apenas inverte a ordem
+      setFilterOrder(current => {
+        const newOrder = current === 'asc' ? 'desc' : 'asc';
+        console.log('Invertendo ordem de data para:', newOrder);
+        return newOrder;
+      });
+    } else {
+      // Se não está ordenando por data, ativa o filtro de data com ordem descendente
+      console.log('Ativando filtro de data com ordem descendente');
+      setActiveFilter('date');
+      setFilterOrder('desc');
+    }
+  }, [activeFilter]);
+
+  const handleToggleValueOrder = useCallback(() => {
+    if (activeFilter === 'value') {
+      // Se já está ordenando por valor, apenas inverte a ordem
+      setFilterOrder(current => {
+        const newOrder = current === 'asc' ? 'desc' : 'asc';
+        console.log('Invertendo ordem de valor para:', newOrder);
+        return newOrder;
+      });
+    } else {
+      // Se não está ordenando por valor, ativa o filtro de valor com ordem descendente
+      console.log('Ativando filtro de valor com ordem descendente');
+      setActiveFilter('value');
+      setFilterOrder('desc');
+    }
+  }, [activeFilter]);
 
   const renderMonthSection = ({ item: monthDate, index }) => {
     // Filtra as despesas ativas para o mês atual da seção
     const monthExpenses = getExpensesForMonth(monthDate, allExpenses, true);
-    // Aplica a ordenação
-    const expenses = sortExpensesByDate(monthExpenses);
+    // Aplica a ordenação com base no filtro ativo
+    console.log('Aplicando ordenação com filtro:', activeFilter, 'e ordem:', filterOrder);
+    const expenses = sortExpenses(monthExpenses);
     const monthName = getMonthName(monthDate);
     const year = monthDate.getFullYear();
 
@@ -1189,7 +1256,7 @@ export default function HomeScreen({ navigation }) {
             <TouchableOpacity style={styles.filterItem} onPress={handleToggleDataOrder}>
               <Text style={styles.filterText}>Data</Text>
               <Ionicons 
-                name={dateOrder === 'asc' ? 'arrow-up' : 'arrow-down'} 
+                name={(activeFilter === 'date' && filterOrder === 'asc') ? 'arrow-up' : 'arrow-down'} 
                 size={16} 
                 color="#666" 
               />
@@ -1203,9 +1270,14 @@ export default function HomeScreen({ navigation }) {
             
             <View style={styles.filterDivider} />
             
-            <View style={styles.filterItem}>
-              {/* Placeholder para filtro de valor */}
-            </View>
+            <TouchableOpacity style={styles.filterItem} onPress={handleToggleValueOrder}>
+              <Text style={styles.filterText}>Valor</Text>
+              <Ionicons 
+                name={(activeFilter === 'value' && filterOrder === 'asc') ? 'arrow-up' : 'arrow-down'} 
+                size={16} 
+                color="#666" 
+              />
+            </TouchableOpacity>
           </View>
 
           {/* Cabeçalho da tabela de despesas com colunas para checkbox, descrição e valor */}
@@ -1455,7 +1527,7 @@ export default function HomeScreen({ navigation }) {
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={handleScroll} // Acionado ao final da rolagem para atualizar o mês
         initialScrollIndex={currentMonthIndex} // Define o mês inicial na montagem
-        extraData={[currentMonthIndex, dateOrder]} // Força re-renderização quando o índice ou ordem mudam
+        extraData={[currentMonthIndex, activeFilter, filterOrder]} // Força re-renderização quando necessário
         getItemLayout={(data, index) => ({ // Otimização para performance da FlatList
           length: width, // Cada item ocupa a largura total da tela
           offset: width * index,
