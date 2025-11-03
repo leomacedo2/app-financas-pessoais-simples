@@ -1253,30 +1253,46 @@ export default function HomeScreen({ navigation }) {
 
           {/* Barra de Filtros */}
           <View style={styles.filtersBar}>
-            <TouchableOpacity style={styles.filterItem} onPress={handleToggleDataOrder}>
-              <Text style={styles.filterText}>Data</Text>
-              <Ionicons 
-                name={(activeFilter === 'date' && filterOrder === 'asc') ? 'arrow-up' : 'arrow-down'} 
-                size={16} 
-                color="#666" 
-              />
+            <TouchableOpacity 
+              style={[
+                styles.filterItem,
+                activeFilter === 'date' && styles.filterItemActive
+              ]} 
+              onPress={handleToggleDataOrder}
+            >
+              <Text style={[
+                styles.filterText,
+                activeFilter === 'date' && styles.filterTextActive
+              ]}>Data</Text>
+              {activeFilter === 'date' && (
+                <Ionicons 
+                  name={filterOrder === 'asc' ? 'arrow-up' : 'arrow-down'} 
+                  size={16} 
+                  color="#1976d2"
+                />
+              )}
             </TouchableOpacity>
             
             <View style={styles.filterDivider} />
             
-            <View style={styles.filterItem}>
-              {/* Placeholder para filtro de status */}
-            </View>
-            
-            <View style={styles.filterDivider} />
-            
-            <TouchableOpacity style={styles.filterItem} onPress={handleToggleValueOrder}>
-              <Text style={styles.filterText}>Valor</Text>
-              <Ionicons 
-                name={(activeFilter === 'value' && filterOrder === 'asc') ? 'arrow-up' : 'arrow-down'} 
-                size={16} 
-                color="#666" 
-              />
+            <TouchableOpacity 
+              style={[
+                styles.filterItem,
+                activeFilter === 'value' && styles.filterItemActive
+              ]} 
+              onPress={handleToggleValueOrder}
+            >
+              <Text style={[
+                styles.filterText,
+                activeFilter === 'value' && styles.filterTextActive
+              ]}>Valor</Text>
+              {activeFilter === 'value' && (
+                <Ionicons 
+                  name={filterOrder === 'asc' ? 'arrow-up' : 'arrow-down'} 
+                  size={16} 
+                  color="#1976d2"
+                />
+              )}
             </TouchableOpacity>
           </View>
 
@@ -1728,13 +1744,21 @@ const styles = StyleSheet.create({
   filterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 4,
+    padding: 8,
+    borderRadius: 6,
+  },
+  filterItemActive: {
+    backgroundColor: '#e3f2fd', // Azul claro para destacar
   },
   // Texto do filtro
   filterText: {
     fontSize: 13,
     color: '#666',
     marginRight: 4,
+  },
+  filterTextActive: {
+    color: '#1976d2', // Azul mais escuro para o texto quando ativo
+    fontWeight: 'bold',
   },
   // Separador vertical entre filtros
   filterDivider: {
