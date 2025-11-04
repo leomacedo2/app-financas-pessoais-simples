@@ -1202,10 +1202,10 @@ export default function HomeScreen({ navigation }) {
         return newOrder;
       });
     } else {
-      // Se não está ordenando por data, ativa o filtro de data com ordem descendente
-      console.log('Ativando filtro de data com ordem descendente');
+      // Se não está ordenando por data, ativa o filtro de data sempre com ordem ascendente
+      console.log('Ativando filtro de data com ordem ascendente');
       setActiveFilter('date');
-      setFilterOrder('desc');
+      setFilterOrder('asc'); // Sempre começa ascendente para datas
     }
   }, [activeFilter]);
 
@@ -1218,10 +1218,10 @@ export default function HomeScreen({ navigation }) {
         return newOrder;
       });
     } else {
-      // Se não está ordenando por valor, ativa o filtro de valor com ordem descendente
+      // Se não está ordenando por valor, ativa o filtro de valor sempre com ordem descendente
       console.log('Ativando filtro de valor com ordem descendente');
       setActiveFilter('value');
-      setFilterOrder('desc');
+      setFilterOrder('desc'); // Sempre começa descendente para valores
     }
   }, [activeFilter]);
 
