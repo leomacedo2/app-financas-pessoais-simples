@@ -345,6 +345,23 @@ export default function HomeScreen({ navigation }) {
   const [activeFilter, setActiveFilter] = useState('date'); // Começa ordenando por data
   const [filterOrder, setFilterOrder] = useState('asc'); // Começa em ordem ascendente
 
+  // Handler para o filtro alfabético
+  const handleToggleAlphaOrder = useCallback(() => {
+    if (activeFilter === 'alpha') {
+      // Se já está ordenando alfabeticamente, apenas inverte a ordem
+      setFilterOrder(current => {
+        const newOrder = current === 'asc' ? 'desc' : 'asc';
+        console.log('Invertendo ordem alfabética para:', newOrder);
+        return newOrder;
+      });
+    } else {
+      // Se não está ordenando alfabeticamente, ativa o filtro alfabético sempre com ordem ascendente
+      console.log('Ativando filtro alfabético com ordem ascendente');
+      setActiveFilter('alpha');
+      setFilterOrder('asc'); // Sempre começa ascendente (A->Z) para ordem alfabética
+    }
+  }, [activeFilter]);
+
   // Estados para controlar a visibilidade e seleção do modal de limpeza de dados
   const [isClearDataModalVisible, setIsClearDataModalVisible] = useState(false);
   const [selectedClearOption, setSelectedClearOption] = useState('4'); // Opção padrão: limpar todos os dados
@@ -1265,6 +1282,28 @@ export default function HomeScreen({ navigation }) {
                 activeFilter === 'date' && styles.filterTextActive
               ]}>Data</Text>
               {activeFilter === 'date' && (
+                <Ionicons 
+                  name={filterOrder === 'asc' ? 'arrow-up' : 'arrow-down'} 
+                  size={16} 
+                  color="#1976d2"
+                />
+              )}
+            </TouchableOpacity>
+            
+            <View style={styles.filterDivider} />
+
+            <TouchableOpacity 
+              style={[
+                styles.filterItem,
+                activeFilter === 'alpha' && styles.filterItemActive
+              ]} 
+              onPress={handleToggleAlphaOrder}
+            >
+              <Text style={[
+                styles.filterText,
+                activeFilter === 'alpha' && styles.filterTextActive
+              ]}>A-Z</Text>
+              {activeFilter === 'alpha' && (
                 <Ionicons 
                   name={filterOrder === 'asc' ? 'arrow-up' : 'arrow-down'} 
                   size={16} 
