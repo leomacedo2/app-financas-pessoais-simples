@@ -358,7 +358,7 @@ export default function HomeScreen({ navigation }) {
       // Se não está ordenando alfabeticamente, ativa o filtro alfabético sempre com ordem ascendente
       console.log('Ativando filtro alfabético com ordem ascendente');
       setActiveFilter('alpha');
-      setFilterOrder('asc'); // Sempre começa ascendente (A->Z) para ordem alfabética
+      setFilterOrder('asc'); // Sempre começa ascendente (A->Z) para ordem alfabética!
     }
   }, [activeFilter]);
 
