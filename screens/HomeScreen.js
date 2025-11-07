@@ -1195,6 +1195,19 @@ export default function HomeScreen({ navigation }) {
         });
         
         return filterOrder === 'asc' ? valueA - valueB : valueB - valueA;
+      } else if (activeFilter === 'alpha') {
+        const descA = (a.description || '').toLowerCase().trim();
+        const descB = (b.description || '').toLowerCase().trim();
+        
+        console.log('Comparando descrições:', { 
+          A: descA, 
+          B: descB,
+          ordem: filterOrder 
+        });
+        
+        return filterOrder === 'asc' 
+          ? descA.localeCompare(descB, 'pt-BR') 
+          : descB.localeCompare(descA, 'pt-BR');
       } else { // date
         const dateA = new Date(a.purchaseDate);
         const dateB = new Date(b.purchaseDate);
