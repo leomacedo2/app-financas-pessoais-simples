@@ -21,6 +21,7 @@ import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert,
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScrollOptimizer } from '../utils/useScrollOptimizer';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons'; // Importa Ionicons para os ícones de checkbox
 
@@ -93,34 +94,15 @@ const formatMonthYearForExclusion = (date) => {
  * @returns {Date[]} Um array de objetos Date, cada um representando o primeiro dia de um mês.
  */
 const generateMonthsToDisplay = async () => {
-  console.log('=== Iniciando generateMonthsToDisplay ===');
   let storedExpenses = [];
   try {
     const expensesJson = await AsyncStorage.getItem(ASYNC_STORAGE_KEYS.EXPENSES);
     if (expensesJson) {
       const allExpenses = JSON.parse(expensesJson);
-      console.log('Todas as despesas encontradas:', allExpenses.length);
-      
       // Filtra apenas despesas não deletadas e ativas
       storedExpenses = allExpenses.filter(expense => {
         const isDeleted = expense.deletedAt || expense.status === 'inactive';
-        if (isDeleted) {
-          console.log(`Ignorando despesa ${expense.id} pois está deletada ou inativa`);
-          return false;
-        }
-        return true;
-      });
-      
-      console.log('Despesas ativas:', storedExpenses.length);
-      
-      // Log detalhado de cada despesa ativa
-      storedExpenses.forEach(expense => {
-        console.log('Despesa ativa:', {
-          id: expense.id,
-          tipo: expense.paymentMethod,
-          valor: expense.value,
-          data: expense.purchaseDate || expense.dueDate
-        });
+        return !isDeleted;
       });
     }
   } catch (error) {
@@ -150,21 +132,12 @@ const generateMonthsToDisplay = async () => {
     }
   });
   
-  console.log('Data mais antiga encontrada:', earliestDate.toLocaleDateString());
-  console.log('Data mais futura encontrada:', latestDate.toLocaleDateString());
-
   // Calcula o período máximo baseado na diferença entre a data mais futura e hoje
   const monthsDiff = (latestDate.getFullYear() - today.getFullYear()) * 12 
                   + (latestDate.getMonth() - today.getMonth());
   let maxFutureMonths = Math.max(12, monthsDiff + 1); // No mínimo 24 meses
-  
-  console.log(`Período máximo calculado: ${maxFutureMonths} meses`);
-
-  console.log('Gerando meses para exibição...');
-  console.log('Total de despesas encontradas:', storedExpenses.length);
 
   // Primeiro, vamos processar as despesas de crédito para determinar o período máximo
-  console.log('=== Processando despesas de crédito ===');
   storedExpenses.forEach(expense => {
     if (expense.paymentMethod === 'Crédito' && expense.dueDate) {
       const dueDate = new Date(expense.dueDate);
@@ -173,19 +146,15 @@ const generateMonthsToDisplay = async () => {
 
       while (currentDate <= dueDate) {
         monthsToShow.add(currentDate.toISOString());
-        console.log(`Adicionando mês ${currentDate.toLocaleDateString()} para parcela de crédito`);
         currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
       }
     }
   });
 
   // Depois processamos as despesas fixas
-  console.log('=== Processando despesas fixas ===');
-  
   // Limita o período máximo a 99 meses (máximo de parcelas permitido)
   const absoluteMaxMonths = 99;
   const effectiveMaxMonths = Math.min(maxFutureMonths, absoluteMaxMonths);
-  console.log(`Período efetivo para despesas fixas: ${effectiveMaxMonths} meses`);
   
   // Para despesas fixas, vamos considerar desde a data mais antiga até a mais futura
   storedExpenses.forEach(expense => {
@@ -203,35 +172,25 @@ const generateMonthsToDisplay = async () => {
   });
 
   // Por fim, processamos as despesas de débito
-  console.log('=== Processando despesas de débito ===');
   storedExpenses.forEach(expense => {
     if (expense.paymentMethod === 'Débito' && expense.purchaseDate) {
       const purchaseDate = new Date(expense.purchaseDate);
       const monthDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), 1);
       monthsToShow.add(monthDate.toISOString());
-      console.log(`Adicionando mês ${monthDate.toLocaleDateString()} para despesa de débito`);
     }
   });
 
   // Sempre garante que o mês atual está incluído
   const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   monthsToShow.add(currentMonth.toISOString());
-  console.log(`Adicionando mês atual: ${currentMonth.toLocaleDateString()}`);
 
   // Converte todas as datas ISO para objetos Date e ordena
   const sortedMonths = Array.from(monthsToShow)
     .map(dateStr => new Date(dateStr))
     .sort((a, b) => a - b);
 
-  console.log('=== Resumo ===');
-  console.log(`Total de meses a exibir: ${sortedMonths.length}`);
-  console.log('Meses que serão exibidos:', sortedMonths.map(date => {
-    return `${date.getMonth() + 1}/${date.getFullYear()}`;
-  }).join(', '));
-
   // Se não houver nenhum mês com despesas, gera um período de 25 meses
   if (sortedMonths.length === 0) {
-    console.log('Nenhum mês encontrado, gerando período padrão de meses');
     const mesesPadrao = [];
     // Gera 12 meses para trás e 12 para frente
     for (let i = -12; i <= 12; i++) {
@@ -1255,7 +1214,7 @@ export default function HomeScreen({ navigation }) {
     }
   }, [activeFilter]);
 
-  const renderMonthSection = ({ item: monthDate, index }) => {
+  const MonthSection = React.memo(({ monthDate, index }) => {
     // Filtra as despesas ativas para o mês atual da seção
     const monthExpenses = getExpensesForMonth(monthDate, allExpenses, true);
     // Aplica a ordenação com base no filtro ativo
@@ -1405,20 +1364,24 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Compara apenas as propriedades necessárias
+    return (
+      prevProps.monthDate.getTime() === nextProps.monthDate.getTime() &&
+      prevProps.index === nextProps.index
+    );
+  });
 
   /**
    * Handler para quando a FlatList termina de rolar.
    * Calcula o novo índice do mês atualmente visível e atualiza o estado `currentMonthIndex`.
    * @param {object} event - O objeto de evento nativo da rolagem.
    */
-  const handleScroll = (event) => {
-    const contentOffsetX = event.nativeEvent.contentOffset.x;
-    const newIndex = Math.round(contentOffsetX / width); // Calcula o índice baseado na largura da tela
+    const { handleScroll, isCurrentlyScrolling } = useScrollOptimizer(width, useCallback((newIndex) => {
     if (newIndex !== currentMonthIndex) {
       setCurrentMonthIndex(newIndex);
     }
-  };
+  }, [currentMonthIndex]));
 
   /**
    * Handler para confirmar a limpeza de dados.
@@ -1588,19 +1551,29 @@ export default function HomeScreen({ navigation }) {
       <FlatList
         ref={flatListRef}
         data={filteredMonthsToDisplay}
-        renderItem={renderMonthSection}
+        renderItem={({ item: monthDate, index }) => <MonthSection monthDate={monthDate} index={index} />}
         keyExtractor={item => String(item.toISOString())}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll} // Acionado ao final da rolagem para atualizar o mês
-        initialScrollIndex={currentMonthIndex} // Define o mês inicial na montagem
-        extraData={[currentMonthIndex, activeFilter, filterOrder]} // Força re-renderização quando necessário
-        getItemLayout={(data, index) => ({ // Otimização para performance da FlatList
-          length: width, // Cada item ocupa a largura total da tela
+        onMomentumScrollEnd={handleScroll}
+        initialScrollIndex={currentMonthIndex}
+        extraData={[currentMonthIndex, activeFilter, filterOrder]}
+        getItemLayout={(data, index) => ({
+          length: width,
           offset: width * index,
           index,
         })}
+        maxToRenderPerBatch={3} // Limita o número de meses renderizados por lote
+        windowSize={5} // Reduz a janela de renderização para melhorar performance
+        initialNumToRender={1} // Renderiza apenas o mês inicial primeiro
+        removeClippedSubviews={true} // Remove views que não estão visíveis
+        maintainVisibleContentPosition={{ // Mantém a posição durante a rolagem
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10
+        }}
+        decelerationRate="fast" // Rolagem mais suave
+        onScroll={() => {}} // Adiciona handler vazio para ativar native event
       />
 
       {/* Container de resumo financeiro do mês atual */}
