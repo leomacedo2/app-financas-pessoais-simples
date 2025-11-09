@@ -1248,6 +1248,8 @@ export default function HomeScreen({ navigation }) {
                 activeFilter === 'date' && styles.filterItemActive
               ]} 
               onPress={handleToggleDataOrder}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={[
                 styles.filterText,
@@ -1270,6 +1272,8 @@ export default function HomeScreen({ navigation }) {
                 activeFilter === 'alpha' && styles.filterItemActive
               ]} 
               onPress={handleToggleAlphaOrder}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={[
                 styles.filterText,
@@ -1292,6 +1296,8 @@ export default function HomeScreen({ navigation }) {
                 activeFilter === 'value' && styles.filterItemActive
               ]} 
               onPress={handleToggleValueOrder}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={[
                 styles.filterText,
@@ -1757,10 +1763,10 @@ const styles = StyleSheet.create({
   // Container da barra de filtros
   filtersBar: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch', // Mudado para stretch para que os filtros ocupem toda a altura
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     backgroundColor: '#f8f9fa',
     marginBottom: 15,
     borderRadius: 8,
@@ -1769,8 +1775,12 @@ const styles = StyleSheet.create({
   filterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 16, // Aumentado o padding horizontal
+    paddingVertical: 12,   // Aumentado o padding vertical
     borderRadius: 6,
+    minWidth: 80, // Largura mínima para garantir área clicável
+    flex: 1, // Faz com que todos os filtros tenham a mesma largura
   },
   filterItemActive: {
     backgroundColor: '#e3f2fd', // Azul claro para destacar
@@ -1788,9 +1798,9 @@ const styles = StyleSheet.create({
   // Separador vertical entre filtros
   filterDivider: {
     width: 1,
-    height: 20,
+    alignSelf: 'stretch',
     backgroundColor: '#dee2e6',
-    marginHorizontal: 8,
+    marginVertical: 8,
   },
   // Container especial para o mês atual (apenas muda a cor de fundo)
   currentMonthTitleContainer: {
