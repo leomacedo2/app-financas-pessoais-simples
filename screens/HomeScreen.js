@@ -1141,7 +1141,7 @@ export default function HomeScreen({ navigation }) {
       ordem: filterOrder
     });
     
-    // Cria uma cópia do array para não modificar o original
+    // Cria uma cópia do array para não modificar o original.
     return [...expenses].sort((a, b) => {
       if (activeFilter === 'value') {
         const valueA = parseFloat(a.value) || 0;
