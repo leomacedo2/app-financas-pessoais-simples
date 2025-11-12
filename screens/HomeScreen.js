@@ -65,15 +65,27 @@ const formatDateForDisplay = (date) => {
  * @returns {string} O nome do mês (ex: "Janeiro").
  */
 const getMonthName = (date) => {
-  const d = new Date(date);
-  const monthNames = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
-  if (d.getMonth() >= 0 && d.getMonth() < monthNames.length) {
-    return monthNames[d.getMonth()];
+  try {
+    if (!date || !(date instanceof Date)) {
+      return 'Mês Inválido';
+    }
+    const d = new Date(date);
+    if (isNaN(d.getTime())) {
+      return 'Mês Inválido';
+    }
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const month = d.getMonth();
+    if (month >= 0 && month < monthNames.length) {
+      return monthNames[month];
+    }
+    return 'Mês Desconhecido'; // Fallback
+  } catch (error) {
+    console.warn('Erro ao obter nome do mês:', error);
+    return 'Mês Inválido';
   }
-  return 'Mês Desconhecido'; // Fallback
 };
 
 /**
@@ -111,12 +123,13 @@ const generateMonthsToDisplay = async () => {
   }
 
   const today = new Date();
-  const monthsToShow = new Set(); // Usamos Set para garantir meses únicos
-  
+  // Armazenamos meses como chaves "YYYY-M" (mês 0-indexado) para evitar chamadas a toISOString()
+  const monthsToShow = new Set();
+
   // Primeiro passo: Encontrar a data mais antiga e mais futura entre todas as despesas ativas
   let earliestDate = new Date(today);
   let latestDate = new Date(today);
-  
+
   // Como já filtramos as despesas inativas/deletadas anteriormente, 
   // aqui só processamos as que estão em storedExpenses
   storedExpenses.forEach(expense => {
@@ -131,42 +144,41 @@ const generateMonthsToDisplay = async () => {
       if (purchaseDate > latestDate) latestDate = new Date(purchaseDate);
     }
   });
-  
+
   // Calcula o período máximo baseado na diferença entre a data mais futura e hoje
   const monthsDiff = (latestDate.getFullYear() - today.getFullYear()) * 12 
                   + (latestDate.getMonth() - today.getMonth());
-  let maxFutureMonths = Math.max(12, monthsDiff + 1); // No mínimo 24 meses
+  let maxFutureMonths = Math.max(12, monthsDiff + 1);
 
-  // Primeiro, vamos processar as despesas de crédito para determinar o período máximo
+  // Primeiro, processa despesas de crédito (parceladas)
   storedExpenses.forEach(expense => {
     if (expense.paymentMethod === 'Crédito' && expense.dueDate) {
       const dueDate = new Date(expense.dueDate);
       const purchaseDate = new Date(expense.purchaseDate);
       let currentDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), 1);
-
-      while (currentDate <= dueDate) {
-        monthsToShow.add(currentDate.toISOString());
+      // safety guard para evitar loops infinitos
+      let safety = 0;
+      while (currentDate <= dueDate && safety < 120) {
+        monthsToShow.add(`${currentDate.getFullYear()}-${currentDate.getMonth()}`);
         currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+        safety++;
       }
     }
   });
 
   // Depois processamos as despesas fixas
-  // Limita o período máximo a 99 meses (máximo de parcelas permitido)
   const absoluteMaxMonths = 99;
   const effectiveMaxMonths = Math.min(maxFutureMonths, absoluteMaxMonths);
-  
-  // Para despesas fixas, vamos considerar desde a data mais antiga até a mais futura
+
   storedExpenses.forEach(expense => {
     if (expense.paymentMethod === 'Fixa') {
-      // Começa da data mais antiga encontrada
       let currentDate = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
       let endDate = new Date(today.getFullYear(), today.getMonth() + effectiveMaxMonths, 1);
-      
-      while (currentDate <= endDate) {
-        monthsToShow.add(currentDate.toISOString());
-        console.log(`Adicionando mês ${currentDate.toLocaleDateString()} para despesa fixa`);
+      let safety = 0;
+      while (currentDate <= endDate && safety < 120) {
+        monthsToShow.add(`${currentDate.getFullYear()}-${currentDate.getMonth()}`);
         currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+        safety++;
       }
     }
   });
@@ -176,17 +188,45 @@ const generateMonthsToDisplay = async () => {
     if (expense.paymentMethod === 'Débito' && expense.purchaseDate) {
       const purchaseDate = new Date(expense.purchaseDate);
       const monthDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), 1);
-      monthsToShow.add(monthDate.toISOString());
+      monthsToShow.add(`${monthDate.getFullYear()}-${monthDate.getMonth()}`);
     }
   });
 
   // Sempre garante que o mês atual está incluído
   const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  monthsToShow.add(currentMonth.toISOString());
+  monthsToShow.add(`${currentMonth.getFullYear()}-${currentMonth.getMonth()}`);
 
-  // Converte todas as datas ISO para objetos Date e ordena
-  const sortedMonths = Array.from(monthsToShow)
-    .map(dateStr => new Date(dateStr))
+  // Converte todas as chaves de volta para objetos Date e ordena
+  const converted = Array.from(monthsToShow).map(key => {
+    try {
+      const parts = String(key).split('-');
+      if (parts.length !== 2) return null;
+      const y = Number(parts[0]);
+      const m = Number(parts[1]);
+      if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
+      // limite razoável para mês (avoid obviously wrong values)
+      if (Math.abs(m) > 1200) return null;
+      // Validação adicional: mês deve estar entre 0-11 e ano entre 1900-2100
+      if (m < 0 || m > 11) return null;
+      if (y < 1900 || y > 2100) return null;
+      const d = new Date(y, m, 1);
+      if (isNaN(d.getTime())) return null;
+      // Verifica se a data criada corresponde aos valores esperados
+      if (d.getFullYear() !== y || d.getMonth() !== m) return null;
+      return d;
+    } catch (e) {
+      console.warn('Erro ao converter chave para Date:', key, e);
+      return null;
+    }
+  });
+
+  const invalidCount = converted.filter(c => c === null).length;
+  if (invalidCount > 0) {
+    console.warn(`generateMonthsToDisplay: ignored ${invalidCount} invalid month keys`);
+  }
+
+  const sortedMonths = converted
+    .filter(Boolean)
     .sort((a, b) => a - b);
 
   // Se não houver nenhum mês com despesas, gera um período de 25 meses
@@ -215,8 +255,7 @@ const generateRandomExpensesData = (monthsToConsider) => {
     'Telefone', 'Transporte', 'Lazer', 'Educação', 'Saúde', 'Restaurante', 'Roupas'
   ];
 
-  console.log("[DEBUG] Iniciando generateRandomExpensesData");
-  console.log("[DEBUG] monthsToConsider:", monthsToConsider);
+  // Debug logs removed to improve performance in production
 
   if (!Array.isArray(monthsToConsider)) {
     console.error("generateRandomExpensesData: monthsToConsider não é um array válido.");
@@ -227,12 +266,12 @@ const generateRandomExpensesData = (monthsToConsider) => {
   const minDespesasPorMes = 3;  // Mínimo de despesas por mês
   const maxDespesasPorMes = 8;  // Máximo de despesas por mês
   
-  console.log("[DEBUG] Meses disponíveis:", monthsToConsider.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
+  // meses disponíveis (debug omitted)
   
   // Usa todos os meses disponíveis para geração de despesas
   const mesesParaGerar = [...monthsToConsider].sort((a, b) => a.getTime() - b.getTime());
   
-  console.log("[DEBUG] Meses para gerar despesas:", mesesParaGerar.map(d => `${d.getMonth() + 1}/${d.getFullYear()}`));
+  // meses para gerar (debug omitted)
   
   // Para cada mês disponível, gera algumas despesas
   mesesParaGerar.forEach((monthDate, monthIndex) => {
@@ -244,7 +283,7 @@ const generateRandomExpensesData = (monthsToConsider) => {
       Math.random() * (maxDespesasPorMes - minDespesasPorMes + 1) + minDespesasPorMes
     );
     
-    console.log(`[DEBUG] Gerando ${numDespesasDesteMes} despesas para ${month + 1}/${year}`);
+  // geração de despesas para o mês (debug omitted)
     
     // Gera as despesas para este mês
     for (let i = 0; i < numDespesasDesteMes; i++) {
@@ -279,12 +318,12 @@ const generateRandomExpensesData = (monthsToConsider) => {
         deletedAt: null
       };
 
-      console.log("[DEBUG] Despesa gerada:", expense);
+  // despesa gerada (omitted)
       generatedExpenses.push(expense);
     }
   });
 
-  console.log("[DEBUG] Total de despesas geradas:", generatedExpenses.length);
+  // total de despesas geradas (omitted)
 
   return generatedExpenses.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 };
@@ -544,6 +583,20 @@ export default function HomeScreen({ navigation }) {
   }, []); // Depende apenas de si mesmo
 
   /**
+   * Função auxiliar para validar se uma data é válida
+   * @param {Date} date - A data a ser validada
+   * @returns {boolean} true se a data é válida, false caso contrário
+   */
+  const isValidDate = (date) => {
+    if (!date || !(date instanceof Date)) return false;
+    if (isNaN(date.getTime())) return false;
+    // Verifica se a data está em um range razoável (entre 1900 e 2100)
+    const year = date.getFullYear();
+    if (year < 1900 || year > 2100) return false;
+    return true;
+  };
+
+  /**
    * `useMemo` para filtrar os meses a serem exibidos na FlatList horizontal.
    * Garante que apenas meses com receitas ou despesas ativas, ou o mês atual do sistema, sejam mostrados.
    * Recomputa apenas quando `monthsToDisplay`, `initialMonthDate`, `allExpenses` ou `allIncomes` mudam.
@@ -553,6 +606,15 @@ export default function HomeScreen({ navigation }) {
     if (!monthsToDisplay || monthsToDisplay.length === 0) {
       return [initialMonthDate];
     }
+    
+    // Filtra datas inválidas primeiro
+    const validMonths = monthsToDisplay.filter(monthDate => isValidDate(monthDate));
+    
+    if (validMonths.length === 0) {
+      console.warn('Nenhum mês válido encontrado, usando mês atual como fallback');
+      return [initialMonthDate];
+    }
+    
     const todayMonth = initialMonthDate.getMonth();
     const todayYear = initialMonthDate.getFullYear();
 
@@ -562,11 +624,13 @@ export default function HomeScreen({ navigation }) {
 
     if (!hasAnyActiveExpenses && !hasAnyActiveIncomes) {
       console.log('Nenhuma movimentação encontrada, mostrando todos os meses disponíveis');
-      return monthsToDisplay.sort((a, b) => a.getTime() - b.getTime());
+      return validMonths.sort((a, b) => a.getTime() - b.getTime());
     }
 
     // Se houver movimentações, filtra os meses que têm algo
-    const filtered = monthsToDisplay.filter(monthDate => {
+    const filtered = validMonths.filter(monthDate => {
+      if (!isValidDate(monthDate)) return false;
+      
       const isCurrentSystemMonth = monthDate.getMonth() === todayMonth && monthDate.getFullYear() === todayYear;
       
       const activeExpensesForMonth = getExpensesForMonth(monthDate, allExpenses, true);
@@ -580,14 +644,47 @@ export default function HomeScreen({ navigation }) {
 
     // Garante que o mês atual do sistema esteja sempre incluído
     const isTodayMonthIncluded = filtered.some(monthDate =>
+      isValidDate(monthDate) &&
       monthDate.getMonth() === todayMonth && monthDate.getFullYear() === todayYear
     );
     if (!isTodayMonthIncluded) {
       filtered.push(initialMonthDate);
     }
 
-    // Ordena os meses cronologicamente
-    return filtered.sort((a, b) => a.getTime() - b.getTime());
+    // Ordena os meses cronologicamente e filtra novamente para garantir que todas as datas são válidas
+    const finalFiltered = filtered
+      .filter(monthDate => isValidDate(monthDate))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    // Log para debug
+    if (finalFiltered.length === 0) {
+      console.warn('filteredMonthsToDisplay: Nenhum mês válido após filtragem, usando mês atual');
+      return [initialMonthDate];
+    }
+
+    // Valida cada data uma última vez antes de retornar
+    const validated = finalFiltered.filter(monthDate => {
+      try {
+        if (!isValidDate(monthDate)) return false;
+        // Testa se os métodos básicos funcionam
+        const testYear = monthDate.getFullYear();
+        const testMonth = monthDate.getMonth();
+        if (!Number.isFinite(testYear) || !Number.isFinite(testMonth)) return false;
+        if (testYear < 1900 || testYear > 2100) return false;
+        if (testMonth < 0 || testMonth > 11) return false;
+        return true;
+      } catch (error) {
+        console.warn('filteredMonthsToDisplay: Erro ao validar data:', error);
+        return false;
+      }
+    });
+
+    if (validated.length === 0) {
+      console.warn('filteredMonthsToDisplay: Nenhum mês válido após validação final, usando mês atual');
+      return [initialMonthDate];
+    }
+
+    return validated;
 
   }, [monthsToDisplay, initialMonthDate, allExpenses, allIncomes, getExpensesForMonth, getIncomesForMonth]);
 
@@ -747,28 +844,40 @@ export default function HomeScreen({ navigation }) {
 
     // Só tenta rolar se o app não estiver carregando e houver meses para exibir
     if (!loadingApp && filteredMonthsToDisplay.length > 0) {
-      const targetIndex = Math.min(
+      // Garante que o índice está sempre dentro dos bounds válidos
+      const safeIndex = Math.max(0, Math.min(
         currentMonthIndex,
         filteredMonthsToDisplay.length - 1
-      );
+      ));
 
       // Se o índice atual está fora do range, ajusta para um valor válido
-      if (currentMonthIndex >= filteredMonthsToDisplay.length) {
-        setCurrentMonthIndex(targetIndex);
+      if (currentMonthIndex !== safeIndex) {
+        setCurrentMonthIndex(safeIndex);
       }
 
-      if (flatListRef.current && !scrollAttempted.current) {
+      if (flatListRef.current && !scrollAttempted.current && safeIndex >= 0 && safeIndex < filteredMonthsToDisplay.length) {
         setTimeout(() => {
-          if (flatListRef.current) {
+          if (flatListRef.current && filteredMonthsToDisplay.length > 0) {
             try {
+              const finalIndex = Math.max(0, Math.min(safeIndex, filteredMonthsToDisplay.length - 1));
               flatListRef.current.scrollToIndex({ 
-                index: targetIndex, 
+                index: finalIndex, 
                 animated: false 
               });
               scrollAttempted.current = true;
-              console.log(`[DEBUG - Scroll useEffect]: Ajustando para índice seguro: ${targetIndex}`);
+              console.log(`[DEBUG - Scroll useEffect]: Ajustando para índice seguro: ${finalIndex}`);
             } catch (error) {
-              console.log('[DEBUG - Scroll useEffect]: Erro ao rolar:', error);
+              console.warn('[DEBUG - Scroll useEffect]: Erro ao rolar:', error);
+              // Fallback: usa scrollToOffset se scrollToIndex falhar
+              try {
+                flatListRef.current.scrollToOffset({ 
+                  offset: safeIndex * width, 
+                  animated: false 
+                });
+                scrollAttempted.current = true;
+              } catch (fallbackError) {
+                console.warn('[DEBUG - Scroll useEffect]: Erro no fallback de scroll:', fallbackError);
+              }
             }
           }
         }, 100);
@@ -1136,10 +1245,7 @@ export default function HomeScreen({ navigation }) {
   const sortExpenses = useCallback((expenses) => {
     if (!activeFilter) return expenses; // Se não há filtro ativo, retorna a lista original
 
-    console.log('Ordenando despesas:', {
-      filtroAtivo: activeFilter,
-      ordem: filterOrder
-    });
+    // ordenando despesas (debug logs removed)
     
     // Cria uma cópia do array para não modificar o original
     return [...expenses].sort((a, b) => {
@@ -1147,11 +1253,7 @@ export default function HomeScreen({ navigation }) {
         const valueA = parseFloat(a.value) || 0;
         const valueB = parseFloat(b.value) || 0;
         
-        console.log('Comparando valores:', { 
-          A: valueA, 
-          B: valueB,
-          ordem: filterOrder 
-        });
+        // comparação de valores (omitted)
         
         return filterOrder === 'asc' ? valueA - valueB : valueB - valueA;
       } else if (activeFilter === 'alpha') {
@@ -1171,12 +1273,18 @@ export default function HomeScreen({ navigation }) {
         const dateA = new Date(a.purchaseDate);
         const dateB = new Date(b.purchaseDate);
         
+        // Usa getTime() em vez de toISOString() para evitar erros com datas inválidas
+        const timeA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
+        const timeB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
+        
         console.log('Comparando datas:', { 
-          A: dateA.toISOString(), 
-          B: dateB.toISOString() 
+          A: timeA, 
+          B: timeB,
+          dateAValid: !isNaN(dateA.getTime()),
+          dateBValid: !isNaN(dateB.getTime())
         });
         
-        return filterOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        return filterOrder === 'asc' ? timeA - timeB : timeB - timeA;
       }
     });
   }, [activeFilter, filterOrder]);
@@ -1215,17 +1323,46 @@ export default function HomeScreen({ navigation }) {
   }, [activeFilter]);
 
   const MonthSection = React.memo(({ monthDate, index }) => {
+    // Valida a data antes de usar
+    if (!monthDate || !(monthDate instanceof Date) || isNaN(monthDate.getTime())) {
+      console.warn(`MonthSection: Data inválida no índice ${index}`, monthDate);
+      return (
+        <View style={styles.monthPage}>
+          <View style={styles.section}>
+            <Text style={styles.noExpensesText}>Erro ao carregar mês</Text>
+          </View>
+        </View>
+      );
+    }
+
     // Filtra as despesas ativas para o mês atual da seção
     const monthExpenses = getExpensesForMonth(monthDate, allExpenses, true);
-    // Aplica a ordenação com base no filtro ativo
-    console.log('Aplicando ordenação com filtro:', activeFilter, 'e ordem:', filterOrder);
-    const expenses = sortExpenses(monthExpenses);
-    const monthName = getMonthName(monthDate);
-    const year = monthDate.getFullYear();
+  // Aplica a ordenação com base no filtro ativo
+  const expenses = sortExpenses(monthExpenses);
+    
+    // Valida novamente antes de usar métodos da data
+    let monthName, year;
+    try {
+      monthName = getMonthName(monthDate);
+      year = monthDate.getFullYear();
+      // Valida se o ano está em um range válido
+      if (!Number.isFinite(year) || year < 1900 || year > 2100) {
+        throw new Error('Ano fora do range válido');
+      }
+    } catch (error) {
+      console.warn(`MonthSection: Erro ao processar data no índice ${index}:`, error);
+      monthName = 'Mês Inválido';
+      year = new Date().getFullYear();
+    }
 
     // Verifica se a seção atual corresponde ao mês atual do sistema para aplicar destaque
-    const isSystemCurrentMonth = monthDate.getMonth() === initialMonthDate.getMonth() &&
-                                 initialMonthDate.getFullYear() === year;
+    let isSystemCurrentMonth = false;
+    try {
+      isSystemCurrentMonth = monthDate.getMonth() === initialMonthDate.getMonth() &&
+                             initialMonthDate.getFullYear() === year;
+    } catch (error) {
+      console.warn('MonthSection: Erro ao comparar datas:', error);
+    }
 
     return (
       <View style={styles.monthPage}>
@@ -1554,33 +1691,145 @@ export default function HomeScreen({ navigation }) {
     )}
 
       {/* FlatList horizontal para exibir os meses paginados */}
-      <FlatList
-        ref={flatListRef}
-        data={filteredMonthsToDisplay}
-        renderItem={({ item: monthDate, index }) => <MonthSection monthDate={monthDate} index={index} />}
-        keyExtractor={item => String(item.toISOString())}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll}
-        initialScrollIndex={currentMonthIndex}
-        extraData={[currentMonthIndex, activeFilter, filterOrder]}
-        getItemLayout={(data, index) => ({
-          length: width,
-          offset: width * index,
-          index,
-        })}
-        maxToRenderPerBatch={3} // Limita o número de meses renderizados por lote
-        windowSize={5} // Reduz a janela de renderização para melhorar performance
-        initialNumToRender={1} // Renderiza apenas o mês inicial primeiro
-        removeClippedSubviews={true} // Remove views que não estão visíveis
-        maintainVisibleContentPosition={{ // Mantém a posição durante a rolagem
-          minIndexForVisible: 0,
-          autoscrollToTopThreshold: 10
-        }}
-        decelerationRate="fast" // Rolagem mais suave
-        onScroll={() => {}} // Adiciona handler vazio para ativar native event
-      />
+      {(() => {
+        // LOG ÚNICO PARA CONFIRMAR VERSÃO - Se você ver isso, está testando a versão correta!
+        console.log('🔵🔵🔵 VERSÃO COM LOGS MELHORADOS - TESTE ' + new Date().getTime() + ' 🔵🔵🔵');
+        
+        // Log de debug para verificar os dados antes de renderizar
+        console.log('[DEBUG V2] filteredMonthsToDisplay antes de renderizar:', {
+          length: filteredMonthsToDisplay.length,
+          firstItem: filteredMonthsToDisplay[0],
+          lastItem: filteredMonthsToDisplay[filteredMonthsToDisplay.length - 1],
+          allValid: filteredMonthsToDisplay.every(d => {
+            try {
+              return d instanceof Date && !isNaN(d.getTime()) && d.getFullYear() >= 1900 && d.getFullYear() <= 2100;
+            } catch {
+              return false;
+            }
+          }),
+          firstItemType: typeof filteredMonthsToDisplay[0],
+          firstItemIsDate: filteredMonthsToDisplay[0] instanceof Date,
+          firstItemGetTime: filteredMonthsToDisplay[0]?.getTime?.(),
+          firstItemGetFullYear: filteredMonthsToDisplay[0]?.getFullYear?.(),
+        });
+
+        // Valida todos os itens antes de renderizar
+        const validData = filteredMonthsToDisplay.filter((item, idx) => {
+          try {
+            if (!item || !(item instanceof Date)) {
+              console.warn(`[DEBUG] Item ${idx} não é uma Date:`, item);
+              return false;
+            }
+            if (isNaN(item.getTime())) {
+              console.warn(`[DEBUG] Item ${idx} tem data inválida (NaN):`, item);
+              return false;
+            }
+            const year = item.getFullYear();
+            if (!Number.isFinite(year) || year < 1900 || year > 2100) {
+              console.warn(`[DEBUG] Item ${idx} tem ano inválido:`, year);
+              return false;
+            }
+            return true;
+          } catch (error) {
+            console.warn(`[DEBUG] Erro ao validar item ${idx}:`, error);
+            return false;
+          }
+        });
+
+        if (validData.length === 0) {
+          console.error('[DEBUG] Nenhum item válido encontrado após validação!');
+          return (
+            <View style={styles.monthPage}>
+              <View style={styles.section}>
+                <Text style={styles.noExpensesText}>Erro: Nenhum mês válido encontrado</Text>
+              </View>
+            </View>
+          );
+        }
+
+        if (validData.length !== filteredMonthsToDisplay.length) {
+          console.warn(`[DEBUG] Filtrados ${filteredMonthsToDisplay.length - validData.length} itens inválidos`);
+        }
+
+        console.log('[DEBUG V2] Criando FlatList com validData.length:', validData.length);
+        console.log('[DEBUG V2] Primeiro item validData:', {
+          item: validData[0],
+          type: typeof validData[0],
+          isDate: validData[0] instanceof Date,
+          getTime: validData[0]?.getTime?.(),
+          getFullYear: validData[0]?.getFullYear?.(),
+          getMonth: validData[0]?.getMonth?.(),
+        });
+
+        return (
+          <FlatList
+            ref={flatListRef}
+            data={validData}
+            renderItem={({ item: monthDate, index }) => {
+              console.log(`[DEBUG V2] renderItem chamado para índice ${index}`);
+              // Valida a data antes de renderizar
+              if (!monthDate || !(monthDate instanceof Date) || isNaN(monthDate.getTime())) {
+                console.warn(`[DEBUG V2] FlatList renderItem: Data inválida no índice ${index}`, monthDate);
+                return (
+                  <View style={[styles.monthPage, { width }]}>
+                    <View style={styles.section}>
+                      <Text style={styles.noExpensesText}>Erro ao carregar mês</Text>
+                    </View>
+                  </View>
+                );
+              }
+              try {
+                // Testa se os métodos básicos funcionam antes de renderizar
+                const testYear = monthDate.getFullYear();
+                const testMonth = monthDate.getMonth();
+                if (!Number.isFinite(testYear) || !Number.isFinite(testMonth)) {
+                  throw new Error('Ano ou mês não são números finitos');
+                }
+                console.log(`[DEBUG V2] Renderizando MonthSection para índice ${index}, ano: ${testYear}, mês: ${testMonth}`);
+                return <MonthSection monthDate={monthDate} index={index} />;
+              } catch (error) {
+                console.error(`[DEBUG V2] Erro ao renderizar item ${index}:`, error);
+                return (
+                  <View style={[styles.monthPage, { width }]}>
+                    <View style={styles.section}>
+                      <Text style={styles.noExpensesText}>Erro: {error.message}</Text>
+                    </View>
+                  </View>
+                );
+              }
+            }}
+            keyExtractor={(item, index) => {
+              console.log(`[DEBUG V2] keyExtractor chamado para índice ${index}`);
+              // Valida a data antes de usar toISOString para evitar erros
+              if (!item || !(item instanceof Date) || isNaN(item.getTime())) {
+                const fallbackKey = `month-${index}-${Date.now()}`;
+                console.warn(`[DEBUG V2] keyExtractor: usando fallback key: ${fallbackKey}`);
+                return fallbackKey;
+              }
+              try {
+                // Usa getTime() em vez de toISOString() para evitar problemas
+                const key = `month-${item.getTime()}-${index}`;
+                console.log(`[DEBUG V2] keyExtractor: key gerada: ${key}`);
+                return key;
+              } catch (error) {
+                console.warn('[DEBUG V2] Erro ao gerar key para item da FlatList:', error);
+                return `month-${index}-${Date.now()}`;
+              }
+            }}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScroll}
+            extraData={[currentMonthIndex, activeFilter, filterOrder]}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            initialNumToRender={1}
+            removeClippedSubviews={false}
+            decelerationRate="fast"
+            onScroll={() => {}}
+          />
+        );
+      })()}
 
       {/* Container de resumo financeiro do mês atual */}
       <View style={styles.summaryContainer}>

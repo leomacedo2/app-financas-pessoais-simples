@@ -22,7 +22,7 @@ export default function ReceitaScreen({ navigation }) {
   const [isActionModalVisible, setIsActionModalVisible] = useState(false);
   const [selectedIncome, setSelectedIncome] = useState(null); // Para guardar a receita selecionada
 
-  /**
+  /** 
    * Função para carregar as receitas do AsyncStorage.
    * Filtra apenas as receitas ativas para exibição na lista principal.
    */
