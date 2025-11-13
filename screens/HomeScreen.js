@@ -348,13 +348,10 @@ export default function HomeScreen({ navigation }) {
     if (activeFilter === 'alpha') {
       // Se já está ordenando alfabeticamente, apenas inverte a ordem
       setFilterOrder(current => {
-        const newOrder = current === 'asc' ? 'desc' : 'asc';
-        console.log('Invertendo ordem alfabética para:', newOrder);
-        return newOrder;
+        return current === 'asc' ? 'desc' : 'asc';
       });
     } else {
       // Se não está ordenando alfabeticamente, ativa o filtro alfabético sempre com ordem ascendente
-      console.log('Ativando filtro alfabético com ordem ascendente');
       setActiveFilter('alpha');
       setFilterOrder('asc'); // Sempre começa ascendente (A->Z) para ordem alfabética
     }
@@ -1260,29 +1257,24 @@ export default function HomeScreen({ navigation }) {
         const descA = (a.description || '').toLowerCase().trim();
         const descB = (b.description || '').toLowerCase().trim();
         
-        console.log('Comparando descrições:', { 
-          A: descA, 
-          B: descB,
-          ordem: filterOrder 
-        });
-        
         return filterOrder === 'asc' 
           ? descA.localeCompare(descB, 'pt-BR') 
           : descB.localeCompare(descA, 'pt-BR');
       } else { // date
-        const dateA = new Date(a.purchaseDate);
-        const dateB = new Date(b.purchaseDate);
+        // Usa dueDate (data de vencimento) como prioridade, fallback para createdAt ou purchaseDate
+        // Isso é consistente com a ordenação padrão em getExpensesForMonth
+        const dateA = new Date(a.dueDate || a.createdAt || a.purchaseDate || 0);
+        const dateB = new Date(b.dueDate || b.createdAt || b.purchaseDate || 0);
         
-        // Usa getTime() em vez de toISOString() para evitar erros com datas inválidas
+        // Valida as datas e trata casos inválidos
         const timeA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
         const timeB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
         
-        console.log('Comparando datas:', { 
-          A: timeA, 
-          B: timeB,
-          dateAValid: !isNaN(dateA.getTime()),
-          dateBValid: !isNaN(dateB.getTime())
-        });
+        // Se ambas as datas forem inválidas (time = 0), mantém a ordem original
+        if (timeA === 0 && timeB === 0) return 0;
+        // Se apenas uma for inválida, coloca no final
+        if (timeA === 0) return 1;
+        if (timeB === 0) return -1;
         
         return filterOrder === 'asc' ? timeA - timeB : timeB - timeA;
       }
@@ -1294,13 +1286,10 @@ export default function HomeScreen({ navigation }) {
     if (activeFilter === 'date') {
       // Se já está ordenando por data, apenas inverte a ordem
       setFilterOrder(current => {
-        const newOrder = current === 'asc' ? 'desc' : 'asc';
-        console.log('Invertendo ordem de data para:', newOrder);
-        return newOrder;
+        return current === 'asc' ? 'desc' : 'asc';
       });
     } else {
       // Se não está ordenando por data, ativa o filtro de data sempre com ordem ascendente
-      console.log('Ativando filtro de data com ordem ascendente');
       setActiveFilter('date');
       setFilterOrder('asc'); // Sempre começa ascendente para datas
     }
@@ -1310,13 +1299,10 @@ export default function HomeScreen({ navigation }) {
     if (activeFilter === 'value') {
       // Se já está ordenando por valor, apenas inverte a ordem
       setFilterOrder(current => {
-        const newOrder = current === 'asc' ? 'desc' : 'asc';
-        console.log('Invertendo ordem de valor para:', newOrder);
-        return newOrder;
+        return current === 'asc' ? 'desc' : 'asc';
       });
     } else {
       // Se não está ordenando por valor, ativa o filtro de valor sempre com ordem descendente
-      console.log('Ativando filtro de valor com ordem descendente');
       setActiveFilter('value');
       setFilterOrder('desc'); // Sempre começa descendente para valores
     }
