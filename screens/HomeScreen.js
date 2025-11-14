@@ -421,6 +421,12 @@ export default function HomeScreen({ navigation }) {
   // Referência para controlar se uma tentativa de rolagem já foi feita (evita múltiplos scrolls)
   const scrollAttempted = useRef(false);
 
+  // Referências para manter as posições de scroll por mês (chave: "YYYY-MM")
+  const scrollPositionsRef = useRef({});
+  
+  // Referências para os ScrollViews de cada mês (chave: "YYYY-MM")
+  const scrollViewRefsRef = useRef({});
+
   /**
    * Função auxiliar para obter o último dia de um determinado mês e ano.
    * @param {number} year - O ano.
@@ -1309,6 +1315,35 @@ export default function HomeScreen({ navigation }) {
   }, [activeFilter]);
 
   const MonthSection = React.memo(({ monthDate, index }) => {
+    // Cria uma ref para o ScrollView deste mês
+    const scrollViewRef = useRef(null);
+    
+    // Gera a chave única para este mês (formato: "YYYY-MM")
+    const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Registra a ref no objeto global quando o componente é montado
+    useEffect(() => {
+      scrollViewRefsRef.current[monthKey] = scrollViewRef;
+      return () => {
+        // Limpa a ref quando o componente é desmontado
+        delete scrollViewRefsRef.current[monthKey];
+        delete scrollPositionsRef.current[monthKey];
+      };
+    }, [monthKey]);
+    
+    // Restaura a posição do scroll após atualizações
+    useEffect(() => {
+      if (scrollViewRef.current && scrollPositionsRef.current[monthKey] !== undefined) {
+        const savedPosition = scrollPositionsRef.current[monthKey];
+        // Usa setTimeout para garantir que o DOM foi atualizado
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({ y: savedPosition, animated: false });
+          }
+        }, 50);
+      }
+    }, [allExpenses, monthKey]); // Restaura quando allExpenses mudar
+    
     // Valida a data antes de usar
     if (!monthDate || !(monthDate instanceof Date) || isNaN(monthDate.getTime())) {
       console.warn(`MonthSection: Data inválida no índice ${index}`, monthDate);
@@ -1445,7 +1480,16 @@ export default function HomeScreen({ navigation }) {
 
           {expenses.length > 0 ? (
             // Exibe a lista de despesas em um ScrollView
-            <ScrollView style={styles.expensesScrollView}>
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.expensesScrollView}
+              onScroll={(event) => {
+                // Salva a posição do scroll continuamente
+                const scrollY = event.nativeEvent.contentOffset.y;
+                scrollPositionsRef.current[monthKey] = scrollY;
+              }}
+              scrollEventThrottle={16}
+            >
               {expenses.map((item) => (
                 <TouchableOpacity 
                   key={String(item.id)} 
@@ -1492,12 +1536,6 @@ export default function HomeScreen({ navigation }) {
           )}
         </View>
       </View>
-    );
-  }, (prevProps, nextProps) => {
-    // Compara apenas as propriedades necessárias
-    return (
-      prevProps.monthDate.getTime() === nextProps.monthDate.getTime() &&
-      prevProps.index === nextProps.index
     );
   });
 
@@ -1806,7 +1844,7 @@ export default function HomeScreen({ navigation }) {
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={handleScroll}
-            extraData={[currentMonthIndex, activeFilter, filterOrder]}
+            extraData={[currentMonthIndex, activeFilter, filterOrder, allExpenses.length]}
             maxToRenderPerBatch={3}
             windowSize={5}
             initialNumToRender={1}
