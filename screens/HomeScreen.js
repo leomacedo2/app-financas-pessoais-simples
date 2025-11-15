@@ -1737,7 +1737,7 @@ export default function HomeScreen({ navigation }) {
           firstItemGetFullYear: filteredMonthsToDisplay[0]?.getFullYear?.(),
         });
 
-        // Valida todos os itens antes de renderizar
+        // Valida todos os itens antes de renderizar. < sandbox
         const validData = filteredMonthsToDisplay.filter((item, idx) => {
           try {
             if (!item || !(item instanceof Date)) {
