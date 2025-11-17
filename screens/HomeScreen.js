@@ -424,8 +424,28 @@ export default function HomeScreen({ navigation }) {
   // Referências para manter as posições de scroll por mês (chave: "YYYY-MM")
   const scrollPositionsRef = useRef({});
   
-  // Referências para os ScrollViews de cada mês (chave: "YYYY-MM")
+  // Referências para os ScrollViews/FlatLists de cada mês (chave: "YYYY-MM")
   const scrollViewRefsRef = useRef({});
+
+  // Flags para indicar quando uma posição de scroll está sendo restaurada
+  const scrollRestoreInProgressRef = useRef({});
+
+  const restoreMonthScrollPosition = useCallback((monthKey) => {
+    if (!monthKey) return;
+    const listRef = scrollViewRefsRef.current[monthKey];
+    const savedPosition = scrollPositionsRef.current[monthKey];
+    if (listRef?.current && typeof savedPosition === 'number') {
+      scrollRestoreInProgressRef.current[monthKey] = true;
+      requestAnimationFrame(() => {
+        if (listRef.current) {
+          listRef.current.scrollToOffset({ offset: savedPosition, animated: false });
+        }
+        requestAnimationFrame(() => {
+          scrollRestoreInProgressRef.current[monthKey] = false;
+        });
+      });
+    }
+  }, []);
 
   /**
    * Função auxiliar para obter o último dia de um determinado mês e ano.
@@ -1002,6 +1022,11 @@ export default function HomeScreen({ navigation }) {
    * @param {string} expenseId - O ID da despesa a ser atualizada.
    */
   const handleTogglePaidStatus = useCallback(async (expenseId) => {
+    const currentMonth = filteredMonthsToDisplay[currentMonthIndex];
+    const currentMonthKey = currentMonth
+      ? `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
+      : null;
+    
     // Extrai o ID base e quaisquer sufixos do ID completo (ex: "ID_BASE-ANO-MES")
     const [baseId, ...suffixes] = expenseId.split('-');
     
@@ -1131,6 +1156,9 @@ export default function HomeScreen({ navigation }) {
 
     updatedExpenses[expenseIndex] = expenseToUpdate; // Atualiza a despesa no array
     setAllExpenses(updatedExpenses); // Atualiza o estado local com as despesas modificadas
+    if (currentMonthKey) {
+      restoreMonthScrollPosition(currentMonthKey);
+    }
     console.log('[DEBUG - handleTogglePaidStatus]: Estado local atualizado com sucesso');
 
     // Persiste a mudança no AsyncStorage
@@ -1141,7 +1169,7 @@ export default function HomeScreen({ navigation }) {
       console.error('Erro ao salvar status da despesa:', error);
       Alert.alert('Erro', 'Ocorreu um erro ao atualizar o status da despesa. Tente novamente.');
     }
-  }, [allExpenses]); // Depende de `allExpenses` para obter o estado mais recente
+  }, [allExpenses, filteredMonthsToDisplay, currentMonthIndex, restoreMonthScrollPosition]); // Depende de `allExpenses` para obter o estado mais recente
 
   /**
    * Calcula a cor de fundo baseada no status e data de vencimento da despesa
@@ -1315,34 +1343,25 @@ export default function HomeScreen({ navigation }) {
   }, [activeFilter]);
 
   const MonthSection = React.memo(({ monthDate, index }) => {
-    // Cria uma ref para o ScrollView deste mês
-    const scrollViewRef = useRef(null);
+    // Cria uma ref para a lista de despesas deste mês
+    const expensesListRef = useRef(null);
     
     // Gera a chave única para este mês (formato: "YYYY-MM")
     const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
     
     // Registra a ref no objeto global quando o componente é montado
     useEffect(() => {
-      scrollViewRefsRef.current[monthKey] = scrollViewRef;
+      scrollViewRefsRef.current[monthKey] = expensesListRef;
+      if (scrollRestoreInProgressRef.current[monthKey] === undefined) {
+        scrollRestoreInProgressRef.current[monthKey] = false;
+      }
       return () => {
         // Limpa a ref quando o componente é desmontado
         delete scrollViewRefsRef.current[monthKey];
         delete scrollPositionsRef.current[monthKey];
+        delete scrollRestoreInProgressRef.current[monthKey];
       };
     }, [monthKey]);
-    
-    // Restaura a posição do scroll após atualizações
-    useEffect(() => {
-      if (scrollViewRef.current && scrollPositionsRef.current[monthKey] !== undefined) {
-        const savedPosition = scrollPositionsRef.current[monthKey];
-        // Usa setTimeout para garantir que o DOM foi atualizado
-        setTimeout(() => {
-          if (scrollViewRef.current) {
-            scrollViewRef.current.scrollTo({ y: savedPosition, animated: false });
-          }
-        }, 50);
-      }
-    }, [allExpenses, monthKey]); // Restaura quando allExpenses mudar
     
     // Valida a data antes de usar
     if (!monthDate || !(monthDate instanceof Date) || isNaN(monthDate.getTime())) {
@@ -1479,29 +1498,22 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           {expenses.length > 0 ? (
-            // Exibe a lista de despesas em um ScrollView
-            <ScrollView 
-              ref={scrollViewRef}
+            // Exibe a lista de despesas em um FlatList vertical (mantém posição naturalmente)
+            <FlatList
+              ref={expensesListRef}
               style={styles.expensesScrollView}
-              onScroll={(event) => {
-                // Salva a posição do scroll continuamente
-                const scrollY = event.nativeEvent.contentOffset.y;
-                scrollPositionsRef.current[monthKey] = scrollY;
-              }}
-              scrollEventThrottle={16}
-            >
-              {expenses.map((item) => (
+              data={expenses}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={({ item }) => (
                 <TouchableOpacity 
-                  key={String(item.id)} 
                   style={[
-                    styles.debitItemRowAdjusted, // Estilo base
-                    { backgroundColor: getExpenseBackgroundColor(item) } // Aplica cor condicional
+                    styles.debitItemRowAdjusted,
+                    { backgroundColor: getExpenseBackgroundColor(item) }
                   ]}
-                  onPress={() => handleTogglePaidStatus(item.id)} // Toque simples para alternar status
-                  onLongPress={() => handleEditExpense(item)} // Toque longo para editar a despesa
-                  activeOpacity={0.7} // Adiciona um feedback visual ao toque
+                  onPress={() => handleTogglePaidStatus(item.id)}
+                  onLongPress={() => handleEditExpense(item)}
+                  activeOpacity={0.7}
                 >
-                  {/* Checkbox (não mais interativo) */}
                   <View style={styles.checkboxContainerAdjusted}>
                     <Ionicons
                       name={item.status === 'paid' ? 'checkbox' : 'square-outline'} 
@@ -1513,23 +1525,27 @@ export default function HomeScreen({ navigation }) {
                   <View style={styles.descriptionAndFooterContainer}>
                     <Text style={styles.debitText}>
                       {String(item.description)}
-                      {/* Adiciona "(Fixa)" à descrição se o método de pagamento for 'Fixa' */}
                       {item.paymentMethod === 'Fixa' && " (Fixa)"}
-                      {/* Adiciona número da parcela para despesas de crédito */}
                       {item.paymentMethod === 'Crédito' && item.installmentNumber && item.totalInstallments && 
                         ` (${item.installmentNumber}/${item.totalInstallments})`}
                     </Text>
-                    {/* Rodapé com informações de Status/Vencimento */}
                     <Text style={styles.expenseStatusFooter}>{getStatusText(item)}</Text>
                   </View>
 
-                  {/* Valor da despesa formatado */}
                   <Text style={[styles.debitValue, styles.valueColumn]}>
                     {`${String(item.value.toFixed(2)).replace('.', ',')} R$`}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              )}
+              onScroll={(event) => {
+                const scrollY = event.nativeEvent.contentOffset.y;
+                if (!scrollRestoreInProgressRef.current[monthKey]) {
+                  scrollPositionsRef.current[monthKey] = scrollY;
+                }
+              }}
+              scrollEventThrottle={16}
+              showsVerticalScrollIndicator={false}
+            />
           ) : (
             // Mensagem se não houver despesas para o mês
             <Text style={styles.noExpensesText}>Nenhuma despesa para este mês.</Text>
